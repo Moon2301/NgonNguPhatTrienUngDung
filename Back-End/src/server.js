@@ -1,6 +1,7 @@
 import cors from 'cors'
 import dotenv from 'dotenv'
 import express from 'express'
+import { closeMongo, connectMongo } from './db.js'
 
 dotenv.config()
 
@@ -23,8 +24,32 @@ app.get('/', (_req, res) => {
 })
 
 const port = Number(process.env.PORT) || 4000
-app.listen(port, () => {
+let server
+
+async function start() {
+  await connectMongo()
+  server = app.listen(port, () => {
+    // eslint-disable-next-line no-console
+    console.log(`API listening on http://localhost:${port}`)
+  })
+  server.on('close', () => {
+    // eslint-disable-next-line no-console
+    console.log('API server closed.')
+  })
+}
+
+start().catch((err) => {
   // eslint-disable-next-line no-console
-  console.log(`API listening on http://localhost:${port}`)
+  console.error(err)
+  process.exit(1)
+})
+
+process.on('SIGINT', async () => {
+  try {
+    if (server) server.close()
+    await closeMongo()
+  } finally {
+    process.exit(0)
+  }
 })
 
