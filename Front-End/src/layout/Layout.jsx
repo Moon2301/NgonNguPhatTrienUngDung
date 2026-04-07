@@ -268,6 +268,10 @@ export default function Layout() {
                     <i className="fa-solid fa-receipt" />
                     Quản Lý Hóa Đơn
                   </Link>
+                  <Link className="sidebar-nav-link accent-admin" to="/admin/users" onClick={() => setSidebarOpen(false)}>
+                    <i className="fa-solid fa-users" />
+                    Quản Lý Người Dùng
+                  </Link>
                 </>
               )}
             </>

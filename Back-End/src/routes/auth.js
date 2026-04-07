@@ -69,9 +69,10 @@ router.post(
 
     const user = await col('users').findOne(
       { username: input.username },
-      { projection: { id: 1, username: 1, passwordHash: 1, email: 1, fullName: 1, role: 1 } },
+      { projection: { id: 1, username: 1, passwordHash: 1, email: 1, fullName: 1, role: 1, is_blocked: 1 } },
     )
     if (!user) return res.status(401).json({ error: 'Sai tên đăng nhập hoặc mật khẩu!' })
+    if (user.is_blocked) return res.status(403).json({ error: 'Tài khoản đã bị khóa.' })
 
     const ok = await bcrypt.compare(input.password, user.passwordHash)
     if (!ok) return res.status(401).json({ error: 'Sai tên đăng nhập hoặc mật khẩu!' })

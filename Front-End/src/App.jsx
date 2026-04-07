@@ -30,6 +30,7 @@ import AdminDashboard from './pages/AdminDashboard.jsx'
 import AdminMovies from './pages/AdminMovies.jsx'
 import AdminShowtimes from './pages/AdminShowtimes.jsx'
 import AdminBookings from './pages/AdminBookings.jsx'
+import AdminUsers from './pages/AdminUsers.jsx'
 import NotFoundPage from './pages/NotFoundPage.jsx'
 
 export default function App() {
@@ -141,6 +142,14 @@ export default function App() {
           element={
             <RequireAdmin>
               <AdminBookings />
+            </RequireAdmin>
+          }
+        />
+        <Route
+          path="admin/users"
+          element={
+            <RequireAdmin>
+              <AdminUsers />
             </RequireAdmin>
           }
         />

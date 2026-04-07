@@ -35,7 +35,7 @@ export default function AdminDashboard() {
       </div>
       <p style={{ marginTop: 24 }}>
         <Link to="/admin/movies">Quản lý phim</Link> · <Link to="/admin/showtimes">Suất chiếu</Link> ·{' '}
-        <Link to="/admin/bookings">Hóa đơn</Link>
+        <Link to="/admin/bookings">Hóa đơn</Link> · <Link to="/admin/users">Người dùng</Link>
       </p>
     </main>
   )
