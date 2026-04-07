@@ -22,7 +22,7 @@ export function AuthProvider({ children }) {
     refresh()
   }, [refresh])
 
-  const login = async (username, password) => {
+  const login = useCallback(async (username, password) => {
     const res = await fetch(`${API_BASE}/api/auth/login`, {
       method: 'POST',
       credentials: 'include',
@@ -33,9 +33,9 @@ export function AuthProvider({ children }) {
     if (!res.ok) throw new Error(data.error || 'Đăng nhập thất bại')
     setUser(data.user)
     return data.user
-  }
+  }, [])
 
-  const register = async (payload) => {
+  const register = useCallback(async (payload) => {
     const res = await fetch(`${API_BASE}/api/auth/register`, {
       method: 'POST',
       credentials: 'include',
@@ -46,14 +46,17 @@ export function AuthProvider({ children }) {
     if (!res.ok) throw new Error(data.error || 'Đăng ký thất bại')
     setUser(data.user)
     return data.user
-  }
+  }, [])
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     await fetch(`${API_BASE}/api/auth/logout`, { method: 'POST', credentials: 'include' })
     setUser(null)
-  }
+  }, [])
 
-  const value = useMemo(() => ({ user, loading, refresh, login, register, logout }), [user, loading, refresh])
+  const value = useMemo(
+    () => ({ user, loading, refresh, login, register, logout }),
+    [user, loading, refresh, login, register, logout],
+  )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
