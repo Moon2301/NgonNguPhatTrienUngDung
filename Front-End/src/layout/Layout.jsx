@@ -41,10 +41,6 @@ export default function Layout() {
         <span className="hide-xs">
           <i className="fa-solid fa-phone" /> Hotline: 1900 0000
         </span>
-        <span className="sep hide-xs">|</span>
-        <Link to="/pele-dating" className="hide-xs" style={{ color: '#ff6b6b' }}>
-          <i className="fa-solid fa-heart" /> Dating
-        </Link>
       </div>
 
       <nav className={`pele-navbar ${navScrolled ? 'scrolled' : ''}`}>
@@ -136,10 +132,6 @@ export default function Layout() {
 
             {user && (
               <>
-                <Link className="btn-dating-nav hide-xs" to="/pele-dating" title="PELE Dating">
-                  <i className="fa-solid fa-heart-pulse" />
-                  <span className="hide-xs">Dating</span>
-                </Link>
                 <div className="user-mini">
                   <div className="user-avatar-nav">{(user.fullName || user.username || '?').charAt(0)}</div>
                   <span className="user-name-nav hide-xs">{user.fullName || user.username}</span>
@@ -151,10 +143,6 @@ export default function Layout() {
                       <Link to="/dating-profile" onClick={() => setDropdownOpen(false)}>
                         <i className="fa-solid fa-user-pen" style={{ color: '#ff6b6b' }} />
                         Hồ sơ Dating
-                      </Link>
-                      <Link to="/my-group-bookings" onClick={() => setDropdownOpen(false)}>
-                        <i className="fa-solid fa-users" style={{ color: '#8b9cff' }} />
-                        Vé Nhóm
                       </Link>
                       <Link to="/my-tickets" onClick={() => setDropdownOpen(false)}>
                         <i className="fa-solid fa-ticket" style={{ color: '#5ce08a' }} />
@@ -199,17 +187,9 @@ export default function Layout() {
         </div>
         <div className="sidebar-body">
           <div className="sidebar-heading">Trải nghiệm đặc biệt</div>
-          <Link className="sidebar-nav-link accent-dating" to="/pele-dating" onClick={() => setSidebarOpen(false)}>
-            <i className="fa-solid fa-heart-circle-bolt" />
-            Xem Phim Cùng Người Lạ
-          </Link>
           <Link className="sidebar-nav-link accent-gold" to="/ticket-market" onClick={() => setSidebarOpen(false)}>
             <i className="fa-solid fa-tags" />
             Chợ Pass Vé
-          </Link>
-          <Link className="sidebar-nav-link accent-violet" to="/group" onClick={() => setSidebarOpen(false)}>
-            <i className="fa-solid fa-users-rectangle" />
-            Đặt Vé Nhóm
           </Link>
 
           <div className="sidebar-heading">Khám phá</div>
@@ -240,10 +220,6 @@ export default function Layout() {
               <Link className="sidebar-nav-link" to="/my-passes" onClick={() => setSidebarOpen(false)}>
                 <i className="fa-solid fa-tag" />
                 Vé Đang Bán
-              </Link>
-              <Link className="sidebar-nav-link" to="/my-group-bookings" onClick={() => setSidebarOpen(false)}>
-                <i className="fa-solid fa-users" />
-                Vé Nhóm Của Tôi
               </Link>
               <Link className="sidebar-nav-link" to="/dating-profile" onClick={() => setSidebarOpen(false)}>
                 <i className="fa-solid fa-user-pen" />

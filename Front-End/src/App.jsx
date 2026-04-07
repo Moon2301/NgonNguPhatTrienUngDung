@@ -20,12 +20,7 @@ import TicketMarketPage from './pages/TicketMarketPage.jsx'
 import TicketPostPage from './pages/TicketPostPage.jsx'
 import TicketDetailPage from './pages/TicketDetailPage.jsx'
 import MyPassesPage from './pages/MyPassesPage.jsx'
-import GroupPage from './pages/GroupPage.jsx'
-import GroupRoomPage from './pages/GroupRoomPage.jsx'
-import MyGroupBookingsPage from './pages/MyGroupBookingsPage.jsx'
 import DatingProfilePage from './pages/DatingProfilePage.jsx'
-import PeleDatingPage from './pages/PeleDatingPage.jsx'
-import DatingChatPage from './pages/DatingChatPage.jsx'
 import AdminDashboard from './pages/AdminDashboard.jsx'
 import AdminMovies from './pages/AdminMovies.jsx'
 import AdminShowtimes from './pages/AdminShowtimes.jsx'
@@ -77,38 +72,11 @@ export default function App() {
           }
         />
 
-        <Route path="group" element={<GroupPage />} />
-        <Route path="group/:roomCode" element={<GroupRoomPage />} />
-        <Route
-          path="my-group-bookings"
-          element={
-            <RequireAuth>
-              <MyGroupBookingsPage />
-            </RequireAuth>
-          }
-        />
-
         <Route
           path="dating-profile"
           element={
             <RequireAuth>
               <DatingProfilePage />
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="pele-dating"
-          element={
-            <RequireAuth>
-              <PeleDatingPage />
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="pele-dating/chat/:matchId"
-          element={
-            <RequireAuth>
-              <DatingChatPage />
             </RequireAuth>
           }
         />
