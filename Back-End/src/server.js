@@ -4,8 +4,10 @@ import express from 'express'
 import session from 'express-session'
 import { closeMongo, connectMongo } from './db.js'
 import authRoutes from './routes/auth.js'
+import datingRoutes from './routes/dating.js'
 import moviesRoutes from './routes/movies.js'
 import promotionsRoutes from './routes/promotions.js'
+import uploadsRoutes from './routes/uploads.js'
 
 dotenv.config()
 
@@ -50,8 +52,10 @@ app.get('/health', (_req, res) => {
 
 app.get('/api/health', (_req, res) => res.json({ ok: true }))
 app.use('/api/auth', authRoutes)
+app.use('/api/dating', datingRoutes)
 app.use('/api/movies', moviesRoutes)
 app.use('/api/promotions', promotionsRoutes)
+app.use('/api/uploads', uploadsRoutes)
 
 app.use((err, _req, res, _next) => {
   const message = err?.message || 'Server error'
