@@ -90,13 +90,18 @@ export default function DatingProfilePage() {
           />
           <div style={{ flex: 1 }}>
             <input
+              id="avatarFile"
               type="file"
               accept="image/png,image/jpeg,image/webp"
               disabled={uploading}
               onChange={(e) => uploadAvatar(e.target.files?.[0])}
+              style={{ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0,0,0,0)', border: 0 }}
             />
+            <label htmlFor="avatarFile" className="btn-clear" style={{ display: 'inline-block', padding: '10px 14px' }}>
+              {uploading ? 'Đang tải...' : 'Chọn ảnh'}
+            </label>
             <p className="muted small" style={{ margin: '6px 0 0' }}>
-              {uploading ? 'Đang tải lên...' : 'Chọn ảnh (tối đa 3MB).'}
+              JPG/PNG/WebP, tối đa 3MB.
             </p>
           </div>
         </div>
@@ -115,11 +120,17 @@ export default function DatingProfilePage() {
           <option value="SINGLE">Độc thân</option>
           <option value="MARRIED">Đã kết hôn</option>
         </select>
-        <label>URL ảnh đại diện</label>
-        <input value={form.avatarUrl} onChange={(e) => setForm({ ...form, avatarUrl: e.target.value })} required />
-        <label>
-          <input type="checkbox" checked={form.isActive} onChange={(e) => setForm({ ...form, isActive: e.target.checked })} /> Hiển thị hồ sơ
-        </label>
+        <div className="toggle-row">
+          <span className="toggle-label">Hiển thị hồ sơ</span>
+          <label className="toggle-switch" aria-label="Hiển thị hồ sơ">
+            <input
+              type="checkbox"
+              checked={!!form.isActive}
+              onChange={(e) => setForm({ ...form, isActive: e.target.checked })}
+            />
+            <span className="toggle-slider" />
+          </label>
+        </div>
         <button type="submit" className="btn-primary-pele">
           Lưu
         </button>

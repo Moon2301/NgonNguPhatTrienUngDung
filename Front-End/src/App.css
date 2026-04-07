@@ -459,3 +459,64 @@
   opacity: 0.5;
   color: var(--primary);
 }
+
+/* Toggle */
+.toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 6px;
+}
+
+.toggle-label {
+  font-size: 0.9rem;
+  color: var(--text-light);
+  font-weight: 700;
+}
+
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 46px;
+  height: 28px;
+  flex: 0 0 auto;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  transition: 0.2s;
+  border-radius: 999px;
+}
+
+.toggle-slider::before {
+  position: absolute;
+  content: '';
+  height: 22px;
+  width: 22px;
+  left: 3px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: #fff;
+  transition: 0.2s;
+  border-radius: 999px;
+}
+
+.toggle-switch input:checked + .toggle-slider {
+  background: rgba(229, 9, 20, 0.75);
+  border-color: rgba(229, 9, 20, 0.6);
+}
+
+.toggle-switch input:checked + .toggle-slider::before {
+  transform: translate(18px, -50%);
+}
