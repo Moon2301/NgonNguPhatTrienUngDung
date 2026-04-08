@@ -8,6 +8,8 @@ import CheckoutPage from './pages/CheckoutPage.jsx'
 import SuccessPage from './pages/SuccessPage.jsx'
 import MyTicketsPage from './pages/MyTicketsPage.jsx'
 import TicketViewPage from './pages/TicketViewPage.jsx'
+import TicketMarketPage from './pages/TicketMarketPage.jsx'
+import MyPassesPage from './pages/MyPassesPage.jsx'
 import { useAuth } from './context/useAuth.js'
 
 const navClass = ({ isActive }) => (isActive ? 'active' : '')
@@ -49,6 +51,15 @@ function AppShell() {
                 <NavLink to="/my-tickets" className={navClass}>
                   Vé của tôi
                 </NavLink>
+                <NavLink to="/market" className={navClass}>
+                  Chợ vé
+                </NavLink>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', background: 'rgba(255,255,255,0.05)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.1)' }}>
+                   <i className="fa-solid fa-wallet" style={{ color: '#e50914' }}></i>
+                   <span style={{ fontWeight: 800, fontSize: 13, color: '#fff' }}>
+                     {user.balance?.toLocaleString()}đ
+                   </span>
+                </div>
                 <button
                   type="button"
                   className="btn-clear"
@@ -72,6 +83,8 @@ function AppShell() {
         <Route path="/booking/success" element={<SuccessPage />} />
         <Route path="/my-tickets" element={<MyTicketsPage />} />
         <Route path="/ticket/view/:bookingId" element={<TicketViewPage />} />
+        <Route path="/market" element={<TicketMarketPage />} />
+        <Route path="/my-passes" element={<MyPassesPage />} />
       </Routes>
     </div>
   )

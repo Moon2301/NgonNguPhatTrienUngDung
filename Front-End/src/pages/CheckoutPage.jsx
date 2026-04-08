@@ -78,8 +78,17 @@ export default function CheckoutPage() {
     }
 
     return (
-        <main className="page-shell" style={{ maxWidth: 520 }}>
-            <h1>Thanh toán</h1>
+        <main className="page-shell" style={{ maxWidth: 520, margin: '0 auto' }}>
+            <div style={{ marginBottom: 24, textAlign: 'left' }}>
+                <button 
+                    onClick={() => navigate(-1)} 
+                    className="back-link" 
+                    style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: 13, color: '#e50914', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}
+                >
+                    <i className="fa-solid fa-chevron-left"></i> Quay lại
+                </button>
+            </div>
+            <h1 style={{ marginTop: 0 }}>Thanh toán</h1>
             <p className="muted">Ghế: {seats.join(', ')}</p>
             <p>
                 Tạm tính: {totalAmount.toLocaleString('vi-VN')}đ
