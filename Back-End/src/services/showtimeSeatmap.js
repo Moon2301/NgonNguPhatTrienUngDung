@@ -2,11 +2,14 @@ import { col } from '../db.js';
 import { parseSeats, uniqueSeats } from '../utils/seats.js';
 import { getHeldSeatsLive } from '../sockets/seatSocket.js';
 
-export const SEAT_HOLD_MS = 5 * 60 * 1000;
+import { getHoldDurationMS } from '../utils/bookingValidation.js';
+
+export const getSeatHoldMs = () => getHoldDurationMS();
 
 
 export async function getSeatStatesForShowtime(showtimeId, currentUserId = null) {
-    const cutoff = Date.now() - SEAT_HOLD_MS;
+    const cutoff = Date.now() - getSeatHoldMs();
+
     const rows = await col('bookings')
         .find(
             { showtime_id: showtimeId, status: { $nin: ['FAILED', 'CANCELLED'] } },

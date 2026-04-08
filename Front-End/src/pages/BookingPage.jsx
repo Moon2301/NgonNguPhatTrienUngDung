@@ -3,6 +3,50 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { io } from 'socket.io-client'
 import { API_BASE } from '../api'
 
+// Helper for lone seat check (Frontend version)
+function checkLoneSeat(row, selectedColsInRow, occupiedColsInRow, totalCols) {
+    const finalOccupied = new Set([...occupiedColsInRow, ...selectedColsInRow]);
+    for (let c = 1; c <= totalCols; c++) {
+        if (!finalOccupied.has(c)) {
+            const leftBound = c === 1 || finalOccupied.has(c - 1);
+            const rightBound = c === totalCols || finalOccupied.has(c + 1);
+            if (leftBound && rightBound) return true;
+        }
+    }
+    return false;
+}
+
+// 2D Adjacency Check (BFS)
+function checkAdjacency(selectedSeats) {
+    if (selectedSeats.size <= 1) return true;
+    
+    const array = Array.from(selectedSeats);
+    const visited = new Set();
+    const queue = [array[0]];
+    visited.add(array[0]);
+
+    while (queue.length > 0) {
+        const curr = queue.shift();
+        const r = curr.charAt(0);
+        const c = parseInt(curr.substring(1));
+
+        const neighbors = [
+            `${String.fromCharCode(r.charCodeAt(0) - 1)}${c}`,
+            `${String.fromCharCode(r.charCodeAt(0) + 1)}${c}`,
+            `${r}${c - 1}`,
+            `${r}${c + 1}`
+        ];
+
+        for (const n of neighbors) {
+            if (selectedSeats.has(n) && !visited.has(n)) {
+                visited.add(n);
+                queue.push(n);
+            }
+        }
+    }
+    return visited.size === selectedSeats.size;
+}
+
 export default function BookingPage() {
     const { showtimeId } = useParams()
     const navigate = useNavigate()
@@ -10,22 +54,58 @@ export default function BookingPage() {
     const [selected, setSelected] = useState(new Set())
     const [err, setErr] = useState('')
     const [socket, setSocket] = useState(null)
+    const [timeLeft, setTimeLeft] = useState(null)
+    const [user, setUser] = useState(null)
 
-    // Fetch Seat Map
-    const fetchSeatmap = () => {
-        fetch(`${API_BASE}/api/bookings/showtimes/${showtimeId}/seatmap`, { credentials: 'include' })
-            .then(async (r) => {
-                const d = await r.json()
-                if (!r.ok) throw new Error(d.error || 'Lỗi')
-                return d
-            })
-            .then(setSeatmap)
-            .catch((e) => setErr(e.message))
+    // Fetch Seat Map & User Session
+    const fetchData = async () => {
+        try {
+            const [smRes, userRes] = await Promise.all([
+                fetch(`${API_BASE}/api/bookings/showtimes/${showtimeId}/seatmap`, { credentials: 'include' }),
+                fetch(`${API_BASE}/api/auth/me`, { credentials: 'include' })
+            ]);
+            
+            const smData = await smRes.json();
+            if (!smRes.ok) throw new Error(smData.error || 'Lỗi tải sơ đồ');
+            setSeatmap(smData);
+
+            if (userRes.ok) {
+                const userData = await userRes.json();
+                setUser(userData.user);
+            }
+        } catch (e) {
+            setErr(e.message);
+        }
     }
 
     useEffect(() => {
-        fetchSeatmap()
+        fetchData()
     }, [showtimeId])
+
+    // Timer Logic
+    useEffect(() => {
+        if (selected.size === 0) {
+            setTimeLeft(null);
+            return;
+        }
+        if (timeLeft === null) {
+            setTimeLeft((seatmap?.holdMinutes || 5) * 60);
+        }
+
+        const timer = setInterval(() => {
+            setTimeLeft(prev => {
+                if (prev <= 1) {
+                    clearInterval(timer);
+                    alert("Hết thời gian giữ ghế! Các ghế đã chọn sẽ bị giải phóng.");
+                    window.location.reload();
+                    return 0;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+
+        return () => clearInterval(timer);
+    }, [selected.size, seatmap]);
 
     // Socket.IO Connection
     useEffect(() => {
@@ -35,7 +115,11 @@ export default function BookingPage() {
         s.emit('join-showtime', showtimeId)
 
         s.on('seat-status-updated', () => {
-            fetchSeatmap()
+            fetchData();
+        })
+
+        s.on('error', (data) => {
+            alert(data.message);
         })
 
         return () => {
@@ -46,36 +130,52 @@ export default function BookingPage() {
     const occupied = useMemo(() => new Set(seatmap?.occupiedSeats || []), [seatmap])
     const myBooked = useMemo(() => new Set(seatmap?.myBookedSeats || []), [seatmap])
 
-    // Generate rows/cols dynamically
     const rows = useMemo(() => {
         if (!seatmap) return []
-        const count = seatmap.rows || 10
         const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
-        return chars.slice(0, count)
+        return chars.slice(0, seatmap.rows || 10)
     }, [seatmap])
 
     const cols = useMemo(() => {
         if (!seatmap) return []
-        const count = seatmap.cols || 10
-        return Array.from({ length: count }, (_, i) => i + 1)
+        return Array.from({ length: seatmap.cols || 10 }, (_, i) => i + 1)
     }, [seatmap])
 
-    // Best Seat Area logic
     const bestArea = useMemo(() => {
         if (!seatmap || !rows.length || !cols.length) return null
-        const rCount = rows.length
-        const cCount = cols.length
         return {
-            rowStart: Math.floor(rCount * 0.3),
-            rowEnd: Math.floor(rCount * 0.75),
-            colStart: Math.floor(cCount * 0.25),
-            colEnd: Math.floor(cCount * 0.75),
+            rowStart: Math.floor(rows.length * 0.3),
+            rowEnd: Math.floor(rows.length * 0.75),
+            colStart: Math.floor(cols.length * 0.25),
+            colEnd: Math.floor(cols.length * 0.75),
         }
     }, [seatmap, rows, cols])
 
+    const isTooLate = useMemo(() => {
+        if (!seatmap?.showtime) return false;
+        const start = new Date(seatmap.showtime.start_time).getTime();
+        const now = Date.now();
+        const fifteenMins = 15 * 60 * 1000;
+        return now > (start - fifteenMins);
+    }, [seatmap]);
+
     function toggle(seat) {
+        if (!user) {
+            alert("Vui lòng đăng nhập để chọn ghế.");
+            return;
+        }
+        if (isTooLate) {
+            alert("Đã quá thời gian đặt vé trực tuyến cho suất chiếu này.");
+            return;
+        }
+
         const isSel = selected.has(seat)
         if (occupied.has(seat) && !isSel) return
+
+        if (!isSel && selected.size >= 8) {
+            alert("Bạn không được giữ quá 8 ghế cùng lúc.");
+            return;
+        }
 
         setSelected((prev) => {
             const n = new Set(prev)
@@ -90,21 +190,35 @@ export default function BookingPage() {
         })
     }
 
-    function next() {
-        const seats = Array.from(selected)
-        if (!seats.length) {
-            alert('Chọn ít nhất một ghế')
-            return
+    function handleNext() {
+        if (selected.size === 0) return;
+
+        // Final local validation: Connected block check
+        if (!checkAdjacency(selected)) {
+            alert("Các ghế được chọn phải nằm cạnh nhau (tạo thành một khối liên tục).");
+            return;
         }
+
+        // Lone seat check for each involved row
+        const rowsInSel = [...new Set(Array.from(selected).map(s => s.charAt(0)))];
+        for (const r of rowsInSel) {
+            const selCols = Array.from(selected).filter(s => s.startsWith(r)).map(s => parseInt(s.substring(1)));
+            const occCols = Array.from(occupied).filter(s => s.startsWith(r) && !selected.has(s)).map(s => parseInt(s.substring(1)));
+            if (checkLoneSeat(r, selCols, occCols, seatmap.cols || 10)) {
+                alert(`Không được để ghế trống đơn lẻ ở hàng ${r}.`);
+                return;
+            }
+        }
+
         const st = seatmap.showtime
         const price = Number(st.price || 0)
         navigate('/checkout', {
             state: {
                 showtimeId: Number(showtimeId),
-                seats,
+                seats: Array.from(selected),
                 showtime: st,
                 pricePerSeat: price,
-                totalAmount: seats.length * price,
+                totalAmount: selected.size * price,
                 products: [], 
             },
         })
@@ -127,21 +241,32 @@ export default function BookingPage() {
                 </div>
             </div>
 
+            {timeLeft !== null && (
+                <div style={{ 
+                    display: 'flex', alignItems: 'center', gap: 12, padding: '12px 20px', 
+                    background: timeLeft < 60 ? 'rgba(229, 9, 20, 0.2)' : 'rgba(255,255,255,0.05)', 
+                    borderRadius: 16, marginBottom: 24, border: '1px solid rgba(255,255,255,0.05)'
+                }}>
+                    <i className="fa-regular fa-clock" style={{ color: timeLeft < 60 ? '#e50914' : '#888' }}></i>
+                    <span style={{ fontSize: 13, color: '#aaa' }}>Thời gian giữ ghế còn lại:</span>
+                    <strong style={{ fontSize: 16, color: timeLeft < 60 ? '#e50914' : '#fff' }}>
+                        {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
+                    </strong>
+                </div>
+            )}
+
             <div className="card-pele" style={{ padding: '60px 20px 40px', background: 'rgba(20, 20, 23, 0.7)', backdropFilter: 'blur(30px)', borderRadius: 32, border: '1px solid rgba(255,255,255,0.05)', boxShadow: '0 30px 60px rgba(0,0,0,0.6)', position: 'relative', overflow: 'hidden' }}>
                 
-                {/* Background Decorations */}
-                <div style={{ position: 'absolute', top: -50, right: -50, width: 200, height: 200, background: 'radial-gradient(circle, rgba(229, 9, 20, 0.05) 0%, transparent 70%)', pointerEvents: 'none' }}></div>
-                <div style={{ position: 'absolute', bottom: -50, left: -50, width: 200, height: 200, background: 'radial-gradient(circle, rgba(229, 9, 20, 0.03) 0%, transparent 70%)', pointerEvents: 'none' }}></div>
+                {isTooLate && (
+                    <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: 40 }}>
+                        <div className="card-pele" style={{ padding: '24px 32px' }}>
+                            <i className="fa-solid fa-hourglass-end" style={{ fontSize: 40, color: '#e50914', marginBottom: 16 }}></i>
+                            <h3 style={{ margin: 0 }}>Hết giờ đặt vé</h3>
+                            <p className="muted" style={{ margin: '8px 0 0' }}>Suất chiếu đã bắt đầu hoặc quá gần giờ chiếu để đặt trực tuyến.</p>
+                        </div>
+                    </div>
+                )}
 
-                {/* Emergency Exits */}
-                <div style={{ position: 'absolute', top: 30, left: 30, color: '#333', fontSize: 10, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 6, opacity: 0.5 }}>
-                    <i className="fa-solid fa-person-running"></i> THOÁT HIỂM
-                </div>
-                <div style={{ position: 'absolute', top: 30, right: 30, color: '#333', fontSize: 10, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 6, opacity: 0.5 }}>
-                    THOÁT HIỂM <i className="fa-solid fa-person-running"></i>
-                </div>
-
-                {/* Screen Indicator */}
                 <div style={{ width: '70%', height: 4, background: 'linear-gradient(90deg, transparent, #e50914, transparent)', margin: '0 auto 12px', borderRadius: 4, boxShadow: '0 8px 30px rgba(229, 9, 20, 0.6)' }}></div>
                 <p style={{ textAlign: 'center', fontSize: 10, color: '#e50914', fontWeight: 900, textTransform: 'uppercase', letterSpacing: 8, marginBottom: 64, opacity: 0.8 }}>MÀN HÌNH</p>
                 
@@ -156,23 +281,8 @@ export default function BookingPage() {
                         margin: '0 auto'
                     }}
                 >
-                    {/* Best Area Frame */}
                     {bestArea && (
-                        <div 
-                            style={{
-                                position: 'absolute',
-                                gridRow: `${bestArea.rowStart + 1} / ${bestArea.rowEnd + 2}`,
-                                gridColumn: `${bestArea.colStart + 2} / ${bestArea.colEnd + 3}`,
-                                top: -6,
-                                left: -6,
-                                right: -6,
-                                bottom: -6,
-                                border: '1px dashed rgba(255,255,255,0.2)',
-                                borderRadius: 12,
-                                pointerEvents: 'none',
-                                zIndex: 0
-                            }}
-                        ></div>
+                        <div style={{ position: 'absolute', gridRow: `${bestArea.rowStart + 1} / ${bestArea.rowEnd + 2}`, gridColumn: `${bestArea.colStart + 2} / ${bestArea.colEnd + 3}`, top: -6, left: -6, right: -6, bottom: -6, border: '1px dashed rgba(255,255,255,0.2)', borderRadius: 12, pointerEvents: 'none' }}></div>
                     )}
 
                     {rows.map((row) => (
@@ -183,39 +293,25 @@ export default function BookingPage() {
                                 const isMine = myBooked.has(id)
                                 const isSel = selected.has(id)
                                 const isOcc = occupied.has(id) && !isSel
-                                
                                 return (
                                     <button
                                         key={id}
                                         type="button"
                                         onClick={() => toggle(id)}
-                                        disabled={isOcc || isMine}
+                                        disabled={isOcc || isMine || isTooLate}
                                         style={{
-                                            width: 36,
-                                            height: 36,
-                                            fontSize: 11,
-                                            borderRadius: 10,
+                                            width: 36, height: 36, fontSize: 11, borderRadius: 10,
                                             border: isMine ? '1.5px solid #4caf50' : isSel ? '1.5px solid #e50914' : isOcc ? '1px solid #222' : '1px solid #2a2a2e',
                                             background: isMine ? 'rgba(76, 175, 80, 0.15)' : isSel ? '#e50914' : isOcc ? '#16161a' : 'rgba(255,255,255,0.02)',
                                             color: isMine ? '#4caf50' : isOcc ? '#333' : '#eee',
-                                            cursor: (isOcc || isMine) ? 'not-allowed' : 'pointer',
+                                            cursor: (isOcc || isMine || isTooLate) ? 'not-allowed' : 'pointer',
                                             transition: 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
                                             boxShadow: isSel ? '0 0 25px rgba(229, 9, 20, 0.5)' : 'none',
-                                            fontWeight: 800,
-                                            position: 'relative',
-                                            overflow: 'hidden',
-                                            zIndex: 1,
+                                            fontWeight: 800, position: 'relative', zIndex: 1,
                                             transform: isSel ? 'scale(1.15)' : 'scale(1)'
                                         }}
                                     >
-                                        {isMine ? (
-                                            <i className="fa-solid fa-user-check" style={{ fontSize: 12 }}></i>
-                                        ) : isOcc ? (
-                                            <span style={{ fontSize: 16, opacity: 0.3 }}>×</span>
-                                        ) : (
-                                            col
-                                        )}
-                                        {isSel && <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'linear-gradient(135deg, rgba(255,255,255,0.3) 0%, transparent 100%)' }}></div>}
+                                        {isMine ? <i className="fa-solid fa-user-check" /> : isOcc ? <span style={{ opacity: 0.3 }}>×</span> : col}
                                     </button>
                                 )
                             })}
@@ -224,61 +320,36 @@ export default function BookingPage() {
                     ))}
                 </div>
 
-                {/* Entrance/Exit Icons */}
                 <div style={{ position: 'absolute', bottom: 30, right: 40, color: '#333', textAlign: 'center', opacity: 0.6 }}>
-                    <i className="fa-solid fa-door-open" style={{ fontSize: 24, display: 'block', marginBottom: 4 }}></i>
-                    <span style={{ fontSize: 9, fontWeight: 900, textTransform: 'uppercase' }}>Lối vào</span>
+                    <i className="fa-solid fa-door-open" style={{ fontSize: 24 }}></i>
+                    <p style={{ fontSize: 9, margin: 0 }}>Lối vào</p>
                 </div>
                 <div style={{ position: 'absolute', bottom: 30, left: 40, color: '#333', textAlign: 'center', opacity: 0.6 }}>
-                    <i className="fa-solid fa-door-open" style={{ fontSize: 24, display: 'block', marginBottom: 4, transform: 'scaleX(-1)' }}></i>
-                    <span style={{ fontSize: 9, fontWeight: 900, textTransform: 'uppercase' }}>Lối ra</span>
+                    <i className="fa-solid fa-door-open" style={{ fontSize: 24, transform: 'scaleX(-1)' }}></i>
+                    <p style={{ fontSize: 9, margin: 0 }}>Lối ra</p>
                 </div>
 
-                {/* Legend */}
-                <div style={{ display: 'flex', justifyContent: 'center', gap: 32, marginTop: 70, fontSize: 11, color: '#666', flexWrap: 'wrap', borderTop: '1px solid rgba(255,255,255,0.03)', paddingTop: 40 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <div style={{ width: 14, height: 14, borderRadius: 4, border: '1px solid #333' }}></div>
-                        <span>Ghế trống</span>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <div style={{ width: 14, height: 14, borderRadius: 4, background: '#e50914' }}></div>
-                        <span style={{ color: '#aaa' }}>Đang chọn</span>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <div style={{ width: 14, height: 14, borderRadius: 4, background: 'rgba(76, 175, 80, 0.1)', border: '1px solid #4caf50', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#4caf50', fontSize: 8 }}><i className="fa-solid fa-user-check"></i></div>
-                        <span>Ghế của bạn</span>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <div style={{ width: 14, height: 14, borderRadius: 4, background: '#16161a', border: '1px solid #222', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#333', fontSize: 10 }}>×</div>
-                        <span>Đã bán / Có người chọn</span>
-                    </div>
+                <div style={{ display: 'flex', justifyContent: 'center', gap: 32, marginTop: 70, fontSize: 11, color: '#666', borderTop: '1px solid rgba(255,255,255,0.03)', paddingTop: 40 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><div style={{ width: 14, height: 14, borderRadius: 4, border: '1px solid #333' }} /> Ghế trống</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><div style={{ width: 14, height: 14, borderRadius: 4, background: '#e50914' }} /> Đang chọn</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><div style={{ width: 14, height: 14, borderRadius: 4, background: '#4caf50' }} /> Ghế của bạn</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><div style={{ width: 14, height: 14, borderRadius: 4, background: '#16161a' }} /> Đã bán</div>
                 </div>
             </div>
 
-            {/* Price & Checkout Section */}
             <div style={{ marginTop: 40, display: 'flex', gap: 20, alignItems: 'stretch' }}>
-                <div style={{ flex: 1, padding: '20px 30px', background: 'rgba(255,255,255,0.02)', borderRadius: 24, border: '1px solid rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                    <p style={{ margin: 0, fontSize: 11, color: '#666', textTransform: 'uppercase', fontWeight: 800, letterSpacing: 1 }}>Đã chọn: {selected.size} ghế</p>
-                    <p style={{ margin: '4px 0 0', fontSize: 24, fontWeight: 900, color: '#fff' }}>{(selected.size * Number(st.price || 0)).toLocaleString('vi-VN')} <span style={{ fontSize: 14, color: '#e50914' }}>đ</span></p>
+                <div style={{ flex: 1, padding: '20px 30px', background: 'rgba(255,255,255,0.02)', borderRadius: 24, border: '1px solid rgba(255,255,255,0.05)' }}>
+                    <p style={{ margin: 0, fontSize: 11, color: '#666', fontWeight: 800 }}>Đã chọn: {selected.size} ghế</p>
+                    <p style={{ margin: '4px 0 0', fontSize: 24, fontWeight: 900, color: '#fff' }}>{(selected.size * Number(st.price || 0)).toLocaleString('vi-VN')} đ</p>
                 </div>
                 <button 
-                    type="button" 
-                    className="btn-primary-pele" 
+                    disabled={selected.size === 0 || isTooLate}
+                    onClick={handleNext}
                     style={{ 
-                        flex: 2, 
-                        borderRadius: 24, 
-                        fontSize: 18, 
-                        fontWeight: 900, 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        justifyContent: 'center', gap: 16,
-                        opacity: selected.size > 0 ? 1 : 0.4,
-                        cursor: selected.size > 0 ? 'pointer' : 'not-allowed',
-                        boxShadow: selected.size > 0 ? '0 15px 30px rgba(229, 9, 20, 0.4)' : 'none',
-                        transition: 'all 0.3s ease'
+                        flex: 2, borderRadius: 24, fontSize: 18, fontWeight: 900, background: '#e50914', color: '#fff', border: 'none',
+                        opacity: (selected.size > 0 && !isTooLate) ? 1 : 0.4, cursor: (selected.size > 0 && !isTooLate) ? 'pointer' : 'not-allowed',
+                        boxShadow: (selected.size > 0 && !isTooLate) ? '0 15px 30px rgba(229, 9, 20, 0.4)' : 'none'
                     }} 
-                    onClick={next}
-                    disabled={selected.size === 0}
                 >
                     Xác nhận đặt vé <i className="fa-solid fa-arrow-right"></i>
                 </button>

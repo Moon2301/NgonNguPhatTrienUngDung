@@ -9,6 +9,7 @@ import { closeMongo, connectMongo } from './db.js'
 import authRoutes from './routes/auth.js'
 import moviesRoutes from './routes/movies.js'
 import promotionsRoutes from './routes/promotions.js'
+import bookingsRoutes from './routes/bookings.js'
 
 dotenv.config()
 
@@ -31,20 +32,21 @@ app.use(
 )
 
 
-app.use(
-  session({
-    name: 'sid',
-    secret: process.env.SESSION_SECRET || 'dev_secret',
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      httpOnly: true,
-      sameSite: 'lax',
-      secure: false,
-      maxAge: 1000 * 60 * 60 * 24 * 7,
-    },
-  }),
-)
+const sessionMiddleware = session({
+  name: 'sid',
+  secret: process.env.SESSION_SECRET || 'dev_secret',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: false,
+    maxAge: 1000 * 60 * 60 * 24 * 7,
+  },
+})
+
+app.use(sessionMiddleware)
+
 
 app.get('/health', (_req, res) => {
   res.json({ ok: true })
@@ -54,7 +56,6 @@ app.get('/api/health', (_req, res) => res.json({ ok: true }))
 app.use('/api/auth', authRoutes)
 app.use('/api/movies', moviesRoutes)
 app.use('/api/promotions', promotionsRoutes)
-import bookingsRoutes from './routes/bookings.js'
 app.use('/api/bookings', bookingsRoutes)
 
 
@@ -76,6 +77,10 @@ const io = new Server(httpServer, {
     origin: allowList,
     credentials: true,
   },
+})
+
+io.use((socket, next) => {
+  sessionMiddleware(socket.request, {}, next)
 })
 
 

@@ -4,7 +4,8 @@ import { asyncHandler } from '../utils/asyncHandler.js';
 import { col, nextId } from '../db.js';
 import { requireAuth } from '../middleware/requireAuth.js';
 import { parseSeats, uniqueSeats } from '../utils/seats.js';
-import { getSeatStatesForShowtime, SEAT_HOLD_MS } from '../services/showtimeSeatmap.js';
+import { getSeatStatesForShowtime, getSeatHoldMs } from '../services/showtimeSeatmap.js';
+import { areAdjacent, leavesLoneSeat } from '../utils/bookingValidation.js';
 
 const router = express.Router();
 
@@ -42,7 +43,7 @@ router.get(
             bookedSeats,
             heldSeats,
             myBookedSeats,
-            holdMinutes: Math.round(SEAT_HOLD_MS / 60000),
+            holdMinutes: Math.round(getSeatHoldMs() / 60000),
         });
 
     })
@@ -73,21 +74,57 @@ router.post(
 
         const input = schema.parse(req.body);
         const showtimeId = input.showtimeId;
+        const userId = req.session?.user?.id;
+
+        if (!userId) return res.status(401).json({ error: 'Bạn cần đăng nhập để đặt vé.' });
 
         const showtime = await col('showtimes').findOne({ id: showtimeId });
         if (!showtime) return res.status(404).json({ error: 'Suất chiếu không tồn tại.' });
+
+        // TIME CHECKS
+        const now = new Date();
+        const startTime = new Date(showtime.start_time);
+        const fifteenMinsBefore = new Date(startTime.getTime() - 15 * 60000);
+
+        if (now > startTime) return res.status(400).json({ error: 'Suất chiếu đã bắt đầu hoặc đã kết thúc.' });
+        if (now > fifteenMinsBefore) return res.status(400).json({ error: 'Đã quá thời hạn đặt vé trực tuyến (15 phút trước giờ chiếu).' });
+
+        // ANTI-SPAM (Max 5 bookings per day)
+        const dayAgo = new Date(now.getTime() - 24 * 60 * 60000);
+        const dailyCount = await col('bookings').countDocuments({ user_id: userId, booking_time: { $gt: dayAgo } });
+        if (dailyCount >= 5) return res.status(429).json({ error: 'Bạn đã đạt giới hạn đặt vé trong ngày (tối đa 5 lần).' });
+
+        // SEAT VALIDATIONS
+        const room = await col('rooms').findOne({ id: showtime.room_id });
+        if (!room) return res.status(500).json({ error: 'Dữ liệu phòng chiếu bị lỗi.' });
+
+        if (!areAdjacent(input.seats)) {
+            return res.status(400).json({ error: 'Các ghế được chọn phải nằm cạnh nhau trong cùng một hàng.' });
+        }
 
         const { occupiedSeats } = await getSeatStatesForShowtime(showtimeId);
         const conflict = input.seats.some((s) => occupiedSeats.includes(s));
         if (conflict) return res.status(409).json({ error: 'Một số ghế đã bị chọn bởi người khác.' });
 
-        const userId = req.session?.user?.id || null;
-        const status = input.paymentMethod === 'VNPAY' ? 'PENDING' : 'SUCCESS';
+        // LONE SEAT CHECK (Check each row in the selection)
+        const rowsInSelection = [...new Set(input.seats.map(s => s.charAt(0)))];
+        for (const rId of rowsInSelection) {
+            const selectedColsInRow = input.seats
+                .filter(s => s.startsWith(rId))
+                .map(s => parseInt(s.substring(1)));
+            const rowOccupiedCols = occupiedSeats
+                .filter(s => s.startsWith(rId))
+                .map(s => parseInt(s.substring(1)));
 
-        // Tính tiền vé
+            if (leavesLoneSeat(rId, selectedColsInRow, rowOccupiedCols, room.total_cols || 10)) {
+                return res.status(400).json({ error: `Không được để ghế trống đơn lẻ ở hàng ${rId}.` });
+            }
+        }
+
+
+        const status = input.paymentMethod === 'VNPAY' ? 'PENDING' : 'SUCCESS';
         const seatAmount = input.seats.length * Number(showtime.price || 0);
 
-        // Tính tiền sản phẩm
         let productAmount = 0;
         const productSnapshots = [];
         if (input.products && input.products.length > 0) {
@@ -110,17 +147,15 @@ router.post(
             }
         }
 
-        // Khuyến mãi
         let promoDiscount = 0;
         let appliedPromo = null;
         if (input.promoCode) {
             const promo = await col('promotions').findOne({ code: input.promoCode, active: true });
             if (promo) {
-                const now = new Date();
                 if (promo.end_date && new Date(promo.end_date) < now) {
-                    // ignore expired
+                    // ignore
                 } else if (promo.min_order_value && (seatAmount + productAmount) < promo.min_order_value) {
-                    // ignore below min
+                    // ignore
                 } else {
                     promoDiscount = Number(promo.discount_value || 0);
                     appliedPromo = promo.code;
@@ -129,8 +164,8 @@ router.post(
         }
 
         const totalAmount = Math.max(0, seatAmount + productAmount - promoDiscount);
-
         const bookingId = await nextId('bookings');
+
         await col('bookings').insertOne({
             id: bookingId,
             user_id: userId,
