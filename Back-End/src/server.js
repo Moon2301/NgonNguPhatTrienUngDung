@@ -23,7 +23,9 @@ app.use(
   cors({
     origin: (origin, cb) => {
       if (!origin) return cb(null, true)
-      const isLocalDev = /^http:\/\/localhost:\d+$/.test(origin) || /^http:\/\/127\.0\.0\.1:\d+$/.test(origin)
+      const isLocalDev = /^http:\/\/localhost:\d+$/.test(origin) || 
+                         /^http:\/\/127\.0\.0\.1:\d+$/.test(origin) ||
+                         /^http:\/\/192\.168\.\d+\.\d+:\d+$/.test(origin)
       if (allowList.includes(origin) || isLocalDev) return cb(null, true)
       return cb(new Error(`CORS blocked origin: ${origin}`))
     },
@@ -90,9 +92,9 @@ let server
 
 async function start() {
   await connectMongo()
-  server = httpServer.listen(port, () => {
+  server = httpServer.listen(port, "0.0.0.0", () => {
     // eslint-disable-next-line no-console
-    console.log(`API + Socket listening on http://localhost:${port}`)
+    console.log(`API + Socket listening on http://0.0.0.0:${port}`)
   })
 }
 

@@ -501,6 +501,7 @@
   cursor: not-allowed;
 }
 
+
 .muted {
   color: var(--text-dim);
 }
@@ -513,3 +514,111 @@
   color: #ff6b6b;
   margin: 0;
 }
+
+/* ─── My Tickets Animations ─── */
+.pulse-dot {
+  width: 8px;
+  height: 8px;
+  background: #e50914;
+  border-radius: 50%;
+  display: inline-block;
+  box-shadow: 0 0 0 rgba(229, 9, 20, 0.4);
+  animation: pulse-red 2s infinite;
+}
+
+@keyframes pulse-red {
+  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(229, 9, 20, 0.7); }
+  70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(229, 9, 20, 0); }
+  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(229, 9, 20, 0); }
+}
+
+.ticket-pass-hover:hover {
+  transform: translateY(-8px) scale(1.02);
+  background: rgba(40, 40, 45, 0.6) !important;
+  border-color: rgba(229, 9, 20, 0.3) !important;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.6) !important;
+}
+
+
+@keyframes modalSlideUp {
+  from { transform: translateY(100px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* ─── Print Ticket Styles ─── */
+/* ─── Print Ticket Styles ─── */
+@media print {
+  /* Hide all UI chrome */
+  .pele-navbar, .pele-topbar, .hide-on-print, header, .tabs-row {
+    display: none !important;
+  }
+  
+  body, html, .app {
+    background: #fff !important;
+    color: #000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    height: auto !important;
+  }
+
+  /* Hide the background list of tickets */
+  .my-tickets-container > div:not(.ticket-modal-overlay) {
+    display: none !important;
+  }
+
+  /* Reset Overlay for Printing */
+  .ticket-modal-overlay {
+    position: static !important;
+    background: none !important;
+    backdrop-filter: none !important;
+    padding: 0 !important;
+    display: block !important;
+    z-index: auto !important;
+  }
+
+  /* Format the modal as the full page content */
+  .ticket-modal-inner {
+    position: static !important;
+    margin: 0 auto !important;
+    box-shadow: none !important;
+    border: 1px solid #eee !important;
+    background: #fff !important;
+    width: 100% !important;
+    max-width: 450px !important;
+    height: auto !important;
+    animation: none !important;
+    border-radius: 20px !important;
+  }
+
+  .ticket-modal-inner h2, 
+  .ticket-modal-inner p, 
+  .ticket-modal-inner span,
+  .ticket-modal-inner strong,
+  .ticket-modal-inner div {
+    color: #000 !important;
+  }
+
+  .ticket-modal-inner img {
+    filter: none !important;
+    opacity: 1 !important;
+  }
+
+  /* Ensure QR code is black and high contrast */
+  .ticket-modal-inner img[alt="QR Code"] {
+    filter: contrast(2) !important;
+  }
+
+  .ticket-modal-inner .muted {
+    color: #444 !important;
+  }
+
+  /* Force color printing */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}
+
+
+
+

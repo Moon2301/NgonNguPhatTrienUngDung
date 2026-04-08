@@ -6,6 +6,8 @@ import RegisterPage from './pages/RegisterPage.jsx'
 import BookingPage from './pages/BookingPage.jsx'
 import CheckoutPage from './pages/CheckoutPage.jsx'
 import SuccessPage from './pages/SuccessPage.jsx'
+import MyTicketsPage from './pages/MyTicketsPage.jsx'
+import TicketViewPage from './pages/TicketViewPage.jsx'
 import { useAuth } from './context/useAuth.js'
 
 const navClass = ({ isActive }) => (isActive ? 'active' : '')
@@ -43,14 +45,19 @@ function AppShell() {
                 </NavLink>
               </>
             ) : (
-              <button
-                type="button"
-                className="btn-clear"
-                onClick={() => logout()}
-                style={{ padding: '8px 14px', borderRadius: 8 }}
-              >
-                Đăng xuất
-              </button>
+              <>
+                <NavLink to="/my-tickets" className={navClass}>
+                  Vé của tôi
+                </NavLink>
+                <button
+                  type="button"
+                  className="btn-clear"
+                  onClick={() => logout()}
+                  style={{ padding: '8px 14px', borderRadius: 8 }}
+                >
+                  Đăng xuất
+                </button>
+              </>
             )}
           </div>
         </div>
@@ -63,6 +70,8 @@ function AppShell() {
         <Route path="/booking/:showtimeId" element={<BookingPage />} />
         <Route path="/checkout" element={<CheckoutPage />} />
         <Route path="/booking/success" element={<SuccessPage />} />
+        <Route path="/my-tickets" element={<MyTicketsPage />} />
+        <Route path="/ticket/view/:bookingId" element={<TicketViewPage />} />
       </Routes>
     </div>
   )
