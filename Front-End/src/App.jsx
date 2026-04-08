@@ -3,6 +3,9 @@ import './App.css'
 import HomePage from './pages/HomePage.jsx'
 import LoginPage from './pages/LoginPage.jsx'
 import RegisterPage from './pages/RegisterPage.jsx'
+import BookingPage from './pages/BookingPage.jsx'
+import CheckoutPage from './pages/CheckoutPage.jsx'
+import SuccessPage from './pages/SuccessPage.jsx'
 import { useAuth } from './context/useAuth.js'
 
 const navClass = ({ isActive }) => (isActive ? 'active' : '')
@@ -57,10 +60,14 @@ function AppShell() {
         <Route path="/" element={<HomePage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        <Route path="/booking/:showtimeId" element={<BookingPage />} />
+        <Route path="/checkout" element={<CheckoutPage />} />
+        <Route path="/booking/success" element={<SuccessPage />} />
       </Routes>
     </div>
   )
 }
+
 
 export default function App() {
   return <AppShell />

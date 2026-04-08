@@ -52,6 +52,10 @@ app.get('/api/health', (_req, res) => res.json({ ok: true }))
 app.use('/api/auth', authRoutes)
 app.use('/api/movies', moviesRoutes)
 app.use('/api/promotions', promotionsRoutes)
+import bookingsRoutes from './routes/bookings.js'
+app.use('/api/bookings', bookingsRoutes)
+
+
 
 app.use((err, _req, res, _next) => {
   const message = err?.message || 'Server error'
