@@ -1,14 +1,9 @@
 import { col } from '../db.js';
 import { parseSeats, uniqueSeats } from '../utils/seats.js';
+import { getHeldSeatsLive } from '../sockets/seatSocket.js';
 
 export const SEAT_HOLD_MS = 5 * 60 * 1000;
 
-/**
- * Mock function for realtime held seats (Socket.IO stuff goes here in Feature 2)
- */
-function getHeldSeatsLive(showtimeId) {
-    return [];
-}
 
 export async function getSeatStatesForShowtime(showtimeId, currentUserId = null) {
     const cutoff = Date.now() - SEAT_HOLD_MS;
