@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/useAuth.js'
 
 export default function LoginPage() {
@@ -30,17 +30,11 @@ export default function LoginPage() {
     <main className="page-shell" style={{ maxWidth: 440 }}>
       <h1>Đăng nhập</h1>
       <form className="form-pele card-pele" onSubmit={onSubmit}>
-        {err && <p className="form-error-msg">{err}</p>}
+        {err && <p style={{ color: '#ff6b6b' }}>{err}</p>}
         <label>Tên đăng nhập</label>
         <input value={username} onChange={(e) => setUsername(e.target.value)} required autoComplete="username" />
         <label>Mật khẩu</label>
-        <input
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-          autoComplete="current-password"
-        />
+        <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password" />
         <button type="submit" className="btn-primary-pele" disabled={loading}>
           {loading ? '...' : 'Đăng nhập'}
         </button>
@@ -51,4 +45,3 @@ export default function LoginPage() {
     </main>
   )
 }
-

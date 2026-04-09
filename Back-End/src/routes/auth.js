@@ -6,9 +6,11 @@ import { asyncHandler } from '../utils/asyncHandler.js'
 
 const router = express.Router()
 
-router.get('/me', (req, res) => {
-  res.json({ user: req.session?.user || null })
-})
+router.get('/me', asyncHandler(async (req, res) => {
+  if (!req.session?.user) return res.json({ user: null })
+  const user = await col('users').findOne({ id: req.session.user.id })
+  res.json({ user: { ...req.session.user, balance: user?.balance || 0 } })
+}))
 
 router.post(
   '/register',
@@ -41,6 +43,7 @@ router.post(
       fullName: input.fullName,
       phone: input.phone || null,
       role,
+      balance: 1000000, // Starting Gift: 1,000,000đ
       createdAt: new Date(),
     }
 
@@ -51,6 +54,7 @@ router.post(
       username: input.username,
       email: input.email,
       fullName: input.fullName,
+      balance: 1000000,
       role,
     }
 
@@ -69,9 +73,10 @@ router.post(
 
     const user = await col('users').findOne(
       { username: input.username },
-      { projection: { id: 1, username: 1, passwordHash: 1, email: 1, fullName: 1, role: 1 } },
+      { projection: { id: 1, username: 1, passwordHash: 1, email: 1, fullName: 1, role: 1, is_blocked: 1 } },
     )
     if (!user) return res.status(401).json({ error: 'Sai tên đăng nhập hoặc mật khẩu!' })
+    if (user.is_blocked) return res.status(403).json({ error: 'Tài khoản đã bị khóa.' })
 
     const ok = await bcrypt.compare(input.password, user.passwordHash)
     if (!ok) return res.status(401).json({ error: 'Sai tên đăng nhập hoặc mật khẩu!' })
@@ -82,6 +87,7 @@ router.post(
       username: u.username,
       email: u.email,
       fullName: u.fullName,
+      balance: user.balance || 0,
       role: u.role,
     }
     return res.json({ user: req.session.user })

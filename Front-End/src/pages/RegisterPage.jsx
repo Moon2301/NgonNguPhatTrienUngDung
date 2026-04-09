@@ -45,12 +45,7 @@ export default function RegisterPage() {
         <label>Tên đăng nhập</label>
         <input value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} required />
         <label>Mật khẩu</label>
-        <input
-          type="password"
-          value={form.password}
-          onChange={(e) => setForm({ ...form, password: e.target.value })}
-          required
-        />
+        <input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required />
         <label>Email</label>
         <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
         <label>Họ tên</label>
@@ -67,4 +62,3 @@ export default function RegisterPage() {
     </main>
   )
 }
-
