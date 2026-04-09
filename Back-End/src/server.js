@@ -6,6 +6,8 @@ import { closeMongo, connectMongo } from './db.js'
 import authRoutes from './routes/auth.js'
 import moviesRoutes from './routes/movies.js'
 import promotionsRoutes from './routes/promotions.js'
+import cinemarRoutes from './routes/cinemar.js'
+import commentRoutes from './routes/comment.js'
 
 dotenv.config()
 
@@ -52,6 +54,8 @@ app.get('/api/health', (_req, res) => res.json({ ok: true }))
 app.use('/api/auth', authRoutes)
 app.use('/api/movies', moviesRoutes)
 app.use('/api/promotions', promotionsRoutes)
+app.use('/api', cinemarRoutes)
+app.use('/api', commentRoutes)
 
 app.use((err, _req, res, _next) => {
   const message = err?.message || 'Server error'

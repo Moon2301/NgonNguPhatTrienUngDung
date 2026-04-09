@@ -3,6 +3,7 @@ import './App.css'
 import HomePage from './pages/HomePage.jsx'
 import LoginPage from './pages/LoginPage.jsx'
 import RegisterPage from './pages/RegisterPage.jsx'
+import CinemaPage from './pages/CinemaPage.jsx'
 import { useAuth } from './context/useAuth.js'
 
 const navClass = ({ isActive }) => (isActive ? 'active' : '')
@@ -30,6 +31,9 @@ function AppShell() {
             <NavLink to="/" end className={navClass}>
               Trang chủ
             </NavLink>
+            <NavLink to="/cinema" className={navClass}>
+              Rạp & Suất chiếu
+            </NavLink>
             {!user ? (
               <>
                 <NavLink to="/login" className={navClass}>
@@ -55,6 +59,7 @@ function AppShell() {
 
       <Routes>
         <Route path="/" element={<HomePage />} />
+        <Route path="/cinema" element={<CinemaPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
       </Routes>
