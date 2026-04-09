@@ -12,6 +12,8 @@ export const seedData = {
       fullName: 'Quản trị PELE',
       phone: '0900000001',
       role: 'ADMIN',
+      wallet: 500000,
+      age: 28,
     },
     {
       username: 'user1',
@@ -20,6 +22,8 @@ export const seedData = {
       fullName: 'Nguyễn Văn A',
       phone: '0900000002',
       role: 'USER',
+      wallet: 120000,
+      age: 22,
     },
     {
       username: 'user2',
@@ -28,6 +32,8 @@ export const seedData = {
       fullName: 'Trần Thị B',
       phone: '0900000003',
       role: 'USER',
+      wallet: 90000,
+      age: 24,
     },
     {
       username: 'demo',
@@ -36,6 +42,8 @@ export const seedData = {
       fullName: 'Tài khoản Demo',
       phone: '0900000004',
       role: 'USER',
+      wallet: 0,
+      age: 18,
     },
   ],
 
@@ -129,9 +137,9 @@ export const seedData = {
   ],
 
   products: [
-    { id: 1, name: 'Combo Bắp + 2 Nước', price: 99000, imageUrl: null },
-    { id: 2, name: 'Pepsi', price: 25000, imageUrl: null },
-    { id: 3, name: 'Nước suối', price: 15000, imageUrl: null },
+    { id: 1, name: 'Combo Bắp + 2 Nước', category: 'Combo', price: 99000, imageUrl: null, active: true },
+    { id: 2, name: 'Pepsi', category: 'Nước', price: 25000, imageUrl: null, active: true },
+    { id: 3, name: 'Nước suối', category: 'Nước', price: 15000, imageUrl: null, active: true },
   ],
 
   promotions: [

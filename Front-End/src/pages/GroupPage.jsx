@@ -2,9 +2,11 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { API_BASE, apiPost } from '../api'
 import PeleSelect from '../components/PeleSelect'
+import { useUi } from '../context/useUi.js'
 
 export default function GroupPage() {
   const navigate = useNavigate()
+  const ui = useUi()
   const [showtimes, setShowtimes] = useState([])
   const [showtimeId, setShowtimeId] = useState('')
   const [creatorName, setCreatorName] = useState('')
@@ -24,6 +26,8 @@ export default function GroupPage() {
   async function createRoom(e) {
     e.preventDefault()
     setErr('')
+    if (!showtimeId) return setErr('Vui lòng chọn suất chiếu.')
+    if (!String(creatorName || '').trim()) return setErr('Vui lòng nhập tên người tạo.')
     try {
       const res = await apiPost('/api/group-bookings', {
         showtimeId: Number(showtimeId),
@@ -31,6 +35,7 @@ export default function GroupPage() {
         creatorEmail: creatorEmail || undefined,
         creatorPhone: creatorPhone || undefined,
       })
+      ui.toast.success('Đã tạo phòng.')
       navigate(`/group/${res.roomCode}`)
     } catch (er) {
       setErr(er.message)
@@ -41,7 +46,7 @@ export default function GroupPage() {
     <main className="page-shell" style={{ maxWidth: 520 }}>
       <h1>Đặt vé nhóm</h1>
       <p className="muted">Tạo phòng, mời bạn bè, chọn ghế và thanh toán.</p>
-      <form className="form-pele card-pele" onSubmit={createRoom}>
+      <form className="form-pele card-pele" onSubmit={createRoom} noValidate>
         {err && <p style={{ color: '#ff6b6b' }}>{err}</p>}
         <PeleSelect
           label="Suất chiếu"
@@ -53,10 +58,10 @@ export default function GroupPage() {
             label: `${s.movieTitle || '—'} — ${s.start_time ? String(s.start_time).slice(0, 16) : ''} — ${Number(s.price || 0).toLocaleString('vi-VN')}đ`,
           }))}
         />
-        {/* Hidden input để HTML form vẫn “required” nếu cần */}
-        <input type="hidden" value={showtimeId} required />
+        {/* noValidate để không bật popup validate của trình duyệt */}
+        <input type="hidden" value={showtimeId} />
         <label>Tên người tạo</label>
-        <input value={creatorName} onChange={(e) => setCreatorName(e.target.value)} required />
+        <input value={creatorName} onChange={(e) => setCreatorName(e.target.value)} />
         <label>Email</label>
         <input type="email" value={creatorEmail} onChange={(e) => setCreatorEmail(e.target.value)} />
         <label>Điện thoại</label>

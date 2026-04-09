@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { API_BASE, apiPost } from '../api'
+import { useUi } from '../context/useUi.js'
 
 export default function GroupRoomPage() {
   const { roomCode } = useParams()
+  const ui = useUi()
   const [data, setData] = useState(null)
   const [invite, setInvite] = useState({ name: '', email: '', phone: '' })
   const [seats, setSeats] = useState('')
@@ -44,13 +46,14 @@ export default function GroupRoomPage() {
         seats,
       })
       load()
+      ui.toast.success('Đã lưu ghế.')
     } catch (er) {
-      alert(er.message)
+      ui.toast.error(er.message)
     }
   }
 
   async function paySingle() {
-    const name = prompt('Tên thanh toán?', 'Khách group')
+    const name = await ui.prompt({ title: 'Thanh toán', label: 'Tên thanh toán', defaultValue: 'Khách group', required: true })
     if (!name) return
     try {
       await fetch(`${API_BASE}/api/group-bookings/${roomCode}/pay-single`, {
@@ -63,10 +66,10 @@ export default function GroupRoomPage() {
         if (!r.ok) throw new Error(d.error || 'Lỗi')
         return d
       })
-      alert('Thanh toán thành công (demo)')
+      ui.toast.success('Thanh toán thành công (demo).')
       load()
     } catch (er) {
-      alert(er.message)
+      ui.toast.error(er.message)
     }
   }
 
@@ -91,9 +94,9 @@ export default function GroupRoomPage() {
       </ul>
 
       <h2 style={{ fontSize: '1rem' }}>Mời thêm</h2>
-      <form className="form-pele card-pele" onSubmit={inviteMember}>
-        <input placeholder="Tên" value={invite.name} onChange={(e) => setInvite({ ...invite, name: e.target.value })} required />
-        <input placeholder="Email" type="email" value={invite.email} onChange={(e) => setInvite({ ...invite, email: e.target.value })} required />
+      <form className="form-pele card-pele" onSubmit={inviteMember} noValidate>
+        <input placeholder="Tên" value={invite.name} onChange={(e) => setInvite({ ...invite, name: e.target.value })} />
+        <input placeholder="Email" type="email" value={invite.email} onChange={(e) => setInvite({ ...invite, email: e.target.value })} />
         <input placeholder="SĐT" value={invite.phone} onChange={(e) => setInvite({ ...invite, phone: e.target.value })} />
         <button type="submit" className="btn-primary-pele">
           Mời
@@ -101,7 +104,7 @@ export default function GroupRoomPage() {
       </form>
 
       <h2 style={{ fontSize: '1rem' }}>Ghế (thành viên)</h2>
-      <form className="form-pele card-pele" onSubmit={saveSeats}>
+      <form className="form-pele card-pele" onSubmit={saveSeats} noValidate>
         <select value={memberId} onChange={(e) => setMemberId(e.target.value)}>
           {data.members?.map((m) => (
             <option key={m.id} value={m.id}>
@@ -109,7 +112,7 @@ export default function GroupRoomPage() {
             </option>
           ))}
         </select>
-        <input placeholder="A1,A2" value={seats} onChange={(e) => setSeats(e.target.value)} required />
+        <input placeholder="A1,A2" value={seats} onChange={(e) => setSeats(e.target.value)} />
         <button type="submit" className="btn-ghost">
           Lưu ghế
         </button>
