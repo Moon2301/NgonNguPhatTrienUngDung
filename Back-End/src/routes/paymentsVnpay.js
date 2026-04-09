@@ -1,10 +1,9 @@
 import crypto from 'crypto'
 import express from 'express'
 import { z } from 'zod'
-import { col } from '../db.js'
+import { col, nextId } from '../db.js'
 import { requireAuth } from '../middleware/requireAuth.js'
 import { asyncHandler } from '../utils/asyncHandler.js'
-import { sendBookingEmail } from '../services/mailService.js'
 
 const router = express.Router()
 
@@ -18,50 +17,42 @@ function getConfig() {
   return { tmnCode, hashSecret, vnpUrl, returnUrl, orderType, expireMinutes }
 }
 
-/** Giống package `vnpay`: chỉ ký trên chuỗi query do URLSearchParams tạo (không tự encode kiểu khác). */
-function buildSortedSearchParams(obj) {
-  const params = new URLSearchParams()
-  const sortedKeys = Object.keys(obj).sort()
-  for (const key of sortedKeys) {
-    const val = obj[key]
-    if (val !== undefined && val !== null && val !== '') params.append(key, String(val))
+function formatVnPayDate(d = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Ho_Chi_Minh',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  }).formatToParts(d)
+  const get = (t) => parts.find((p) => p.type === t)?.value || ''
+  return `${get('year')}${get('month')}${get('day')}${get('hour')}${get('minute')}${get('second')}`
+}
+
+function sortObject(obj) {
+  return Object.keys(obj)
+    .sort()
+    .reduce((acc, k) => {
+      acc[k] = obj[k]
+      return acc
+    }, {})
+}
+
+function buildQuery(params) {
+  const usp = new URLSearchParams()
+  for (const [k, v] of Object.entries(params)) {
+    if (v === undefined || v === null) continue
+    usp.append(k, String(v))
   }
-  return params
+  return usp.toString()
 }
 
-function signSearchQueryString(queryString, secret) {
-  return crypto.createHmac('sha512', secret).update(Buffer.from(queryString, 'utf-8')).digest('hex')
-}
-
-/** yyyyMMddHHmmss theo giờ Asia/Ho_Chi_Minh (sandbox VNPay yêu cầu). */
-function formatVnpDateVN(d = new Date()) {
-  const parts = Object.fromEntries(
-    new Intl.DateTimeFormat('en-US', {
-      timeZone: 'Asia/Ho_Chi_Minh',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: false,
-    })
-      .formatToParts(d)
-      .filter((x) => x.type !== 'literal')
-      .map((x) => [x.type, x.value]),
-  )
-  return `${parts.year}${parts.month}${parts.day}${parts.hour}${parts.minute}${parts.second}`
-}
-
-function getClientIp(req) {
-  const xf = req.headers['x-forwarded-for']
-  let ip =
-    typeof xf === 'string' && xf.trim()
-      ? xf.split(',')[0].trim()
-      : req.socket?.remoteAddress || '127.0.0.1'
-  if (ip.startsWith('::ffff:')) ip = ip.slice(7)
-  if (ip === '::1') ip = '127.0.0.1'
-  return ip
+function signParams(sortedParams, hashSecret) {
+  const signData = buildQuery(sortedParams)
+  return crypto.createHmac('sha512', hashSecret).update(Buffer.from(signData, 'utf-8')).digest('hex')
 }
 
 router.post(
@@ -73,57 +64,73 @@ router.post(
     }
 
     const schema = z.object({
-      bookingId: z.coerce.number().int().min(1),
+      bookingId: z.coerce.number(),
       amount: z.coerce.number().min(0),
-      orderInfo: z.string().optional(),
-      returnUrl: z.string().url().optional(),
+      orderInfo: z.string().min(1).max(255),
+      returnUrl: z.string().optional().nullable(),
     })
     const input = schema.parse(req.body)
 
     const booking = await col('bookings').findOne({ id: input.bookingId })
     if (!booking) return res.status(404).json({ error: 'Booking không tồn tại.' })
 
-    const now = new Date()
-    const txnRef = `${input.bookingId}_${now.getTime()}`
+    const bookingAmount = Number(booking.total_amount || 0)
+    if (Number(input.amount) !== bookingAmount) {
+      return res.status(400).json({ error: 'Số tiền không hợp lệ.' })
+    }
+
+    const txnRef = `BOOK_${booking.id}_${Date.now()}`
+    const ipAddr = req.headers['x-forwarded-for']?.toString().split(',')[0]?.trim() || req.socket.remoteAddress || '127.0.0.1'
+    const createDate = formatVnPayDate(new Date())
+
     const vnpParams = {
       vnp_Version: '2.1.0',
       vnp_Command: 'pay',
       vnp_TmnCode: cfg.tmnCode,
-      vnp_Amount: Math.round(Number(input.amount) * 100),
+      vnp_Locale: 'vn',
       vnp_CurrCode: 'VND',
       vnp_TxnRef: txnRef,
-      vnp_OrderInfo: input.orderInfo || `Thanh toan booking #${input.bookingId}`,
+      vnp_OrderInfo: input.orderInfo,
       vnp_OrderType: cfg.orderType,
-      vnp_Locale: 'vn',
-      vnp_ReturnUrl: input.returnUrl || cfg.returnUrl,
-      vnp_IpAddr: getClientIp(req),
-      vnp_CreateDate: formatVnpDateVN(now),
-    }
-    if (cfg.expireMinutes > 0) {
-      vnpParams.vnp_ExpireDate = formatVnpDateVN(new Date(now.getTime() + cfg.expireMinutes * 60 * 1000))
+      vnp_Amount: Math.round(bookingAmount * 100),
+      vnp_ReturnUrl: (input.returnUrl || cfg.returnUrl).trim(),
+      vnp_IpAddr: ipAddr,
+      vnp_CreateDate: createDate,
     }
 
-    const params = buildSortedSearchParams(vnpParams)
-    const signData = params.toString()
-    const secureHash = signSearchQueryString(signData, cfg.hashSecret)
-    params.append('vnp_SecureHash', secureHash)
-    const url = `${cfg.vnpUrl}?${params.toString()}`
+    if (cfg.expireMinutes > 0) {
+      vnpParams.vnp_ExpireDate = formatVnPayDate(new Date(Date.now() + cfg.expireMinutes * 60000))
+    }
+
+    const sorted = sortObject(vnpParams)
+    const secureHash = signParams(sorted, cfg.hashSecret)
+    const url = `${cfg.vnpUrl}?${buildQuery({ ...sorted, vnp_SecureHash: secureHash })}`
 
     await col('payments').insertOne({
+      id: await nextId('payments'),
       provider: 'VNPAY',
-      booking_id: input.bookingId,
-      txn_ref: txnRef,
-      amount: Number(input.amount),
+      purpose: 'BOOKING',
       status: 'CREATED',
+      booking_id: booking.id,
+      user_id: booking.user_id ?? null,
+      amount: bookingAmount,
+      txn_ref: txnRef,
       created_at: new Date(),
+      updated_at: new Date(),
     })
 
     await col('bookings').updateOne(
-      { id: input.bookingId },
-      { $set: { payment_method: 'VNPAY', payment_status: 'CREATED', payment_txn_ref: txnRef, updated_at: new Date() } },
+      { id: booking.id },
+      {
+        $set: {
+          payment_method: 'VNPAY',
+          payment_status: 'CREATED',
+          payment_txn_ref: txnRef,
+        },
+      },
     )
 
-    return res.json({ url, txnRef })
+    res.status(201).json({ url, txnRef })
   }),
 )
 
@@ -138,52 +145,52 @@ router.post(
 
     const schema = z.object({
       amount: z.coerce.number().min(1000),
-      orderInfo: z.string().optional(),
-      returnUrl: z.string().url().optional(),
+      returnUrl: z.string().optional().nullable(),
     })
     const input = schema.parse(req.body)
 
+    const amount = Math.round(Number(input.amount))
     const userId = req.session.user.id
-    const now = new Date()
-    const amount = Math.round(Number(input.amount || 0))
-    const txnRef = `TOPUP_${userId}_${now.getTime()}`
+    const txnRef = `TOPUP_${userId}_${Date.now()}`
+    const ipAddr = req.headers['x-forwarded-for']?.toString().split(',')[0]?.trim() || req.socket.remoteAddress || '127.0.0.1'
 
     const vnpParams = {
       vnp_Version: '2.1.0',
       vnp_Command: 'pay',
       vnp_TmnCode: cfg.tmnCode,
-      vnp_Amount: Math.round(amount * 100),
+      vnp_Locale: 'vn',
       vnp_CurrCode: 'VND',
       vnp_TxnRef: txnRef,
-      vnp_OrderInfo: input.orderInfo || `NAP_VI_${amount}_${userId}`,
+      vnp_OrderInfo: `Nạp ví #${userId}`,
       vnp_OrderType: cfg.orderType,
-      vnp_Locale: 'vn',
-      vnp_ReturnUrl: input.returnUrl || cfg.returnUrl,
-      vnp_IpAddr: getClientIp(req),
-      vnp_CreateDate: formatVnpDateVN(now),
-    }
-    if (cfg.expireMinutes > 0) {
-      vnpParams.vnp_ExpireDate = formatVnpDateVN(new Date(now.getTime() + cfg.expireMinutes * 60 * 1000))
+      vnp_Amount: Math.round(amount * 100),
+      vnp_ReturnUrl: (input.returnUrl || cfg.returnUrl).trim(),
+      vnp_IpAddr: ipAddr,
+      vnp_CreateDate: formatVnPayDate(new Date()),
     }
 
-    const params = buildSortedSearchParams(vnpParams)
-    const signData = params.toString()
-    const secureHash = signSearchQueryString(signData, cfg.hashSecret)
-    params.append('vnp_SecureHash', secureHash)
-    const url = `${cfg.vnpUrl}?${params.toString()}`
+    if (cfg.expireMinutes > 0) {
+      vnpParams.vnp_ExpireDate = formatVnPayDate(new Date(Date.now() + cfg.expireMinutes * 60000))
+    }
+
+    const sorted = sortObject(vnpParams)
+    const secureHash = signParams(sorted, cfg.hashSecret)
+    const url = `${cfg.vnpUrl}?${buildQuery({ ...sorted, vnp_SecureHash: secureHash })}`
 
     await col('payments').insertOne({
+      id: await nextId('payments'),
       provider: 'VNPAY',
       purpose: 'TOPUP',
-      user_id: userId,
-      booking_id: null,
-      txn_ref: txnRef,
-      amount,
       status: 'CREATED',
+      booking_id: null,
+      user_id: userId,
+      amount,
+      txn_ref: txnRef,
       created_at: new Date(),
+      updated_at: new Date(),
     })
 
-    return res.json({ url, txnRef })
+    res.status(201).json({ url, txnRef })
   }),
 )
 
@@ -193,33 +200,31 @@ router.get(
     const cfg = getConfig()
     if (!cfg.hashSecret) return res.status(500).json({ error: 'Thiếu cấu hình VNPay (VNPAY_HASH_SECRET).' })
 
-    // VNPay chỉ ký trên các field vnp_*
-    const secureHash = String(req.query.vnp_SecureHash || '').trim()
-    const fields = {}
+    const secureHash = String(req.query.vnp_SecureHash || '')
+    const vnp = {}
     for (const [k, v] of Object.entries(req.query || {})) {
       if (!k.startsWith('vnp_')) continue
-      if (k === 'vnp_SecureHash' || k === 'vnp_SecureHashType') continue
-      fields[k] = Array.isArray(v) ? v[0] : v
+      if (k === 'vnp_SecureHash') continue
+      vnp[k] = v
     }
 
-    const returnParams = buildSortedSearchParams(fields)
-    const expected = signSearchQueryString(returnParams.toString(), cfg.hashSecret)
-    if (!secureHash || secureHash.toLowerCase() !== expected.toLowerCase()) {
-      return res.status(400).json({ ok: false, error: 'Sai chữ ký VNPay.' })
+    const sorted = sortObject(vnp)
+    const signed = signParams(sorted, cfg.hashSecret)
+    if (!secureHash || signed !== secureHash) {
+      return res.status(400).json({ error: 'Chữ ký VNPay không hợp lệ.' })
     }
 
     const txnRef = String(req.query.vnp_TxnRef || '')
     const respCode = String(req.query.vnp_ResponseCode || '')
-    const amount = Number(req.query.vnp_Amount || 0) / 100
+    const amount = Math.round((Number(req.query.vnp_Amount || 0) || 0) / 100)
+    const success = respCode === '00'
+    const newStatus = success ? 'SUCCESS' : 'FAILED'
 
     const pay = await col('payments').findOne({ provider: 'VNPAY', txn_ref: txnRef })
-    if (!pay) return res.status(404).json({ ok: false, error: 'Không tìm thấy giao dịch.' })
-
-    const isSuccess = respCode === '00'
-    const newStatus = isSuccess ? 'SUCCESS' : 'FAILED'
+    if (!pay) return res.status(404).json({ error: 'Không tìm thấy giao dịch.' })
 
     await col('payments').updateOne(
-      { _id: pay._id },
+      { id: pay.id },
       {
         $set: {
           status: newStatus,
@@ -231,75 +236,44 @@ router.get(
       },
     )
 
-    if (isSuccess) {
+    if (success) {
       if (pay.purpose === 'TOPUP') {
-        const inc = Math.round(Number(pay.amount || amount || 0))
-        if (inc > 0 && pay.user_id) {
-          await col('users').updateOne({ id: Number(pay.user_id) }, { $inc: { wallet: inc } })
-          if (req.session?.user?.id && Number(req.session.user.id) === Number(pay.user_id)) {
-            req.session.user.wallet = Number(req.session.user.wallet || 0) + inc
-          }
+        await col('users').updateOne({ id: pay.user_id }, { $inc: { wallet: amount } })
+        if (req.session?.user?.id === pay.user_id) {
+          req.session.user.wallet = Number(req.session.user.wallet || 0) + amount
         }
-        return res.json({
-          ok: true,
-          success: true,
-          purpose: 'TOPUP',
-          amount: inc,
-        })
-      }
-
-      // increment promo usage if applied (best-effort + atomic limit check)
-      const booking = await col('bookings').findOne({ id: pay.booking_id }, { projection: { promo_code: 1 } })
-      const code = String(booking?.promo_code || '').trim()
-      if (code) {
-        const promo = await col('promotions').findOne({ code }, { projection: { usage_limit: 1, usage_count: 1 } })
-        if (promo) {
-          const limit = promo.usage_limit == null ? null : Number(promo.usage_limit)
-          const used = promo.usage_count == null ? 0 : Number(promo.usage_count)
-          if (limit == null || !Number.isFinite(limit) || limit < 0) {
-            await col('promotions').updateOne({ code }, { $inc: { usage_count: 1 } })
-          } else if (used < limit) {
-            // usage_count có thể bị thiếu/null ở dữ liệu cũ → vẫn cho phép dùng và tự tạo field khi $inc
-            const ok = await col('promotions').updateOne(
-              { code, $or: [{ usage_count: { $exists: false } }, { usage_count: { $lt: limit } }] },
-              { $inc: { usage_count: 1 } },
-            )
-            if (!ok?.modifiedCount) {
-              await col('bookings').updateOne(
-                { id: pay.booking_id },
-                { $set: { status: 'FAILED', payment_status: 'FAILED', updated_at: new Date() } },
-              )
-              return res.json({ ok: true, success: false, bookingId: pay.booking_id, txnRef, responseCode: 'PROMO_LIMIT' })
+      } else if (pay.purpose === 'BOOKING') {
+        const booking = await col('bookings').findOne({ id: pay.booking_id })
+        if (booking) {
+          if (booking.promo_code) {
+            const promo = await col('promotions').findOne({ code: booking.promo_code, active: true })
+            if (promo) {
+              if (promo.usage_limit == null) {
+                await col('promotions').updateOne({ code: booking.promo_code }, { $inc: { usage_count: 1 } })
+              } else {
+                await col('promotions').updateOne(
+                  { code: booking.promo_code, usage_count: { $lt: promo.usage_limit } },
+                  { $inc: { usage_count: 1 } },
+                )
+              }
             }
-          } else {
-            await col('bookings').updateOne(
-              { id: pay.booking_id },
-              { $set: { status: 'FAILED', payment_status: 'FAILED', updated_at: new Date() } },
-            )
-            return res.json({ ok: true, success: false, bookingId: pay.booking_id, txnRef, responseCode: 'PROMO_LIMIT' })
           }
+
+          await col('bookings').updateOne(
+            { id: booking.id },
+            { $set: { status: 'SUCCESS', payment_status: 'SUCCESS' } },
+          )
         }
       }
-      await col('bookings').updateOne(
-        { id: pay.booking_id },
-        { $set: { status: 'SUCCESS', payment_status: 'SUCCESS', updated_at: new Date() } },
-      )
-      // Send confirmation email
-      await sendBookingEmail(pay.booking_id)
     } else {
-      if (pay.purpose === 'TOPUP') {
-        return res.json({ ok: true, success: false, purpose: 'TOPUP', responseCode: respCode })
+      if (pay.purpose === 'BOOKING' && pay.booking_id != null) {
+        await col('bookings').updateOne({ id: pay.booking_id }, { $set: { status: 'FAILED', payment_status: 'FAILED' } })
       }
-      await col('bookings').updateOne(
-        { id: pay.booking_id },
-        { $set: { status: 'FAILED', payment_status: newStatus, updated_at: new Date() } },
-      )
     }
 
-    return res.json({
-      ok: true,
-      success: isSuccess,
-      purpose: pay.purpose || 'BOOKING',
+    res.json({
+      success,
+      purpose: pay.purpose,
       bookingId: pay.booking_id,
       txnRef,
       responseCode: respCode,

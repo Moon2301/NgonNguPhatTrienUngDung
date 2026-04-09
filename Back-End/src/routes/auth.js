@@ -6,9 +6,11 @@ import { asyncHandler } from '../utils/asyncHandler.js'
 
 const router = express.Router()
 
-router.get('/me', (req, res) => {
-  res.json({ user: req.session?.user || null })
-})
+router.get('/me', asyncHandler(async (req, res) => {
+  if (!req.session?.user) return res.json({ user: null })
+  const user = await col('users').findOne({ id: req.session.user.id })
+  res.json({ user: { ...req.session.user, balance: user?.balance || 0 } })
+}))
 
 router.post(
   '/register',

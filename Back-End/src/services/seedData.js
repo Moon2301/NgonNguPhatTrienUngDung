@@ -47,10 +47,19 @@ export const seedData = {
     },
   ],
 
+  cinemas: [
+    { id: 1, name: 'PELE Cinema Quận 1', address: '123 Lê Lợi, Quận 1, TP.HCM', city: 'TP.HCM', phone: '02812345678', active: true },
+    { id: 2, name: 'PELE Cinema Bình Thạnh', address: '456 Điện Biên Phủ, Bình Thạnh, TP.HCM', city: 'TP.HCM', phone: '02823456789', active: true },
+    { id: 3, name: 'PELE Cinema Đà Nẵng', address: '789 Nguyễn Văn Linh, Đà Nẵng', city: 'Đà Nẵng', phone: '02361234567', active: true },
+  ],
+
   rooms: [
-    { id: 1, name: 'Phòng 01', totalRows: 10, totalCols: 10 },
-    { id: 2, name: 'Phòng 02', totalRows: 10, totalCols: 10 },
-    { id: 3, name: 'Phòng IMAX (demo)', totalRows: 10, totalCols: 12 },
+    { id: 1, cinemaId: 1, name: 'Phòng 01', totalRows: 10, totalCols: 10 },
+    { id: 2, cinemaId: 1, name: 'Phòng 02', totalRows: 10, totalCols: 10 },
+    { id: 3, cinemaId: 1, name: 'Phòng IMAX', totalRows: 10, totalCols: 12 },
+    { id: 4, cinemaId: 2, name: 'Phòng A', totalRows: 8, totalCols: 10 },
+    { id: 5, cinemaId: 2, name: 'Phòng B', totalRows: 8, totalCols: 10 },
+    { id: 6, cinemaId: 3, name: 'Phòng 1', totalRows: 10, totalCols: 10 },
   ],
 
   movies: [
@@ -129,11 +138,11 @@ export const seedData = {
   ],
 
   showtimes: [
-    { id: 1, movieId: 1, roomId: 1, offsetDays: 1, hour: 19, minute: 30, price: 80000 },
-    { id: 2, movieId: 2, roomId: 2, offsetDays: 2, hour: 20, minute: 0, price: 90000 },
-    { id: 3, movieId: 1, roomId: 1, offsetDays: 3, hour: 14, minute: 0, price: 75000 },
-    { id: 4, movieId: 4, roomId: 3, offsetDays: 5, hour: 21, minute: 15, price: 120000 },
-    { id: 5, movieId: 5, roomId: 2, offsetDays: 7, hour: 18, minute: 45, price: 85000 },
+    { id: 1, movieId: 1, cinemaId: 1, roomId: 1, date: new Date(Date.now() + 86400000), hour: 19, minute: 30, price: 80000 },
+    { id: 2, movieId: 2, cinemaId: 1, roomId: 2, date: new Date(Date.now() + 86400000 * 2), hour: 20, minute: 0, price: 90000 },
+    { id: 3, movieId: 1, cinemaId: 2, roomId: 4, date: new Date(Date.now() + 86400000 * 3), hour: 14, minute: 0, price: 75000 },
+    { id: 4, movieId: 4, cinemaId: 1, roomId: 3, date: new Date(Date.now() + 86400000 * 5), hour: 21, minute: 15, price: 120000 },
+    { id: 5, movieId: 5, cinemaId: 3, roomId: 6, date: new Date(Date.now() + 86400000 * 7), hour: 18, minute: 45, price: 85000 },
   ],
 
   products: [
@@ -200,4 +209,3 @@ export const seedData = {
     },
   ],
 }
-

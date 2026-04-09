@@ -3,7 +3,9 @@ import dotenv from 'dotenv'
 import express from 'express'
 import http from 'http'
 import session from 'express-session'
-import { Server as SocketIOServer } from 'socket.io'
+import { createServer } from 'http'
+import { Server } from 'socket.io'
+import { registerSeatSocket } from './sockets/seatSocket.js'
 import { closeMongo, connectMongo } from './db.js'
 import { registerSeatSocket } from './socket/seatSocket.js'
 import authRoutes from './routes/auth.js'
@@ -15,10 +17,11 @@ import newsRoutes from './routes/news.js'
 import paymentsVnpayRoutes from './routes/paymentsVnpay.js'
 import profileRoutes from './routes/profile.js'
 import promotionsRoutes from './routes/promotions.js'
-import showtimesRoutes from './routes/showtimes.js'
-import ticketPassesRoutes from './routes/ticketPasses.js'
-import ticketsRoutes from './routes/tickets.js'
+import cinemarRoutes from './routes/cinemar.js'
+import commentRoutes from './routes/comment.js'
+import bookingsRoutes from './routes/bookings.js'
 import uploadsRoutes from './routes/uploads.js'
+import paymentsVnpayRoutes from './routes/paymentsVnpay.js'
 
 dotenv.config()
 
@@ -26,43 +29,43 @@ const app = express()
 app.set('trust proxy', 1)
 
 app.use(express.json())
+const rawOrigin = process.env.CLIENT_ORIGIN || 'http://localhost:5173'
+const allowList = rawOrigin.split(',').map((s) => s.trim()).filter(Boolean)
+
+const isOriginAllowed = (origin) => {
+  if (!origin) return true
+  const isLocalDev = /^http:\/\/localhost:\d+$/.test(origin) || 
+                     /^http:\/\/127\.0\.0\.1:\d+$/.test(origin) ||
+                     /^http:\/\/192\.168\.\d+\.\d+:\d+$/.test(origin)
+  return allowList.includes(origin) || isLocalDev
+}
+
 app.use(
   cors({
     origin: (origin, cb) => {
-      if (!origin) return cb(null, true)
-      const raw = process.env.CLIENT_ORIGIN || 'http://localhost:5173,https://web.moon2301.space'
-      const allowList = raw
-        .split(',')
-        .map((s) => s.trim())
-        .filter(Boolean)
-      const isLocalDev = 
-        /^http:\/\/localhost:\d+$/.test(origin) || 
-        /^http:\/\/127\.0\.0\.1:\d+$/.test(origin) ||
-        /^http:\/\/192\.168\.\d+\.\d+:\d+$/.test(origin) ||
-        /^http:\/\/10\.\d+\.\d+\.\d+:\d+$/.test(origin) ||
-        /^http:\/\/172\.(1[6-9]|2[0-9]|3[0-1])\.\d+\.\d+:\d+$/.test(origin)
-      if (allowList.includes(origin) || isLocalDev) return cb(null, true)
+      if (isOriginAllowed(origin)) return cb(null, true)
       return cb(new Error(`CORS blocked origin: ${origin}`))
     },
     credentials: true,
   }),
 )
 
-/** Session middleware (shared with Socket.IO) */
-export const sessionMiddleware = session({
+
+const sessionMiddleware = session({
   name: 'sid',
   secret: process.env.SESSION_SECRET || 'dev_secret',
   resave: false,
   saveUninitialized: false,
   cookie: {
     httpOnly: true,
-    sameSite: process.env.COOKIE_SAMESITE || 'lax',
-    secure: process.env.COOKIE_SECURE === 'true',
+    sameSite: 'lax',
+    secure: false,
     maxAge: 1000 * 60 * 60 * 24 * 7,
   },
 })
 
 app.use(sessionMiddleware)
+
 
 app.get('/health', (_req, res) => {
   res.json({ ok: true })
@@ -78,10 +81,11 @@ app.use('/api/news', newsRoutes)
 app.use('/api/payments/vnpay', paymentsVnpayRoutes)
 app.use('/api/profile', profileRoutes)
 app.use('/api/promotions', promotionsRoutes)
-app.use('/api/showtimes', showtimesRoutes)
-app.use('/api/ticket-passes', ticketPassesRoutes)
-app.use('/api/tickets', ticketsRoutes)
+app.use('/api', cinemarRoutes)
+app.use('/api', commentRoutes)
 app.use('/api/uploads', uploadsRoutes)
+app.use('/api/bookings', bookingsRoutes)
+app.use('/api/payments/vnpay', paymentsVnpayRoutes)
 
 app.use((err, _req, res, _next) => {
   const message = err?.message || 'Server error'
@@ -94,44 +98,32 @@ app.use((err, _req, res, _next) => {
 })
 
 const port = Number(process.env.PORT) || 4000
+const httpServer = createServer(app)
+const io = new Server(httpServer, {
+  cors: {
+    origin: (origin, cb) => {
+      if (isOriginAllowed(origin)) return cb(null, true)
+      return cb(null, false)
+    },
+    credentials: true,
+  },
+})
+
+io.use((socket, next) => {
+  sessionMiddleware(socket.request, {}, next)
+})
+
+
+registerSeatSocket(io)
+
 let server
 let io
 
 async function start() {
   await connectMongo()
-  server = http.createServer(app)
-
-  io = new SocketIOServer(server, {
-    cors: {
-      origin: (origin, cb) => {
-        if (!origin) return cb(null, true)
-        const raw = process.env.CLIENT_ORIGIN || 'http://localhost:5173'
-        const allowList = raw
-          .split(',')
-          .map((s) => s.trim())
-          .filter(Boolean)
-        const isLocalDev = 
-          /^http:\/\/localhost:\d+$/.test(origin) || 
-          /^http:\/\/127\.0\.0\.1:\d+$/.test(origin) ||
-          /^http:\/\/192\.168\.\d+\.\d+:\d+$/.test(origin) ||
-          /^http:\/\/10\.\d+\.\d+\.\d+:\d+$/.test(origin) ||
-          /^http:\/\/172\.(1[6-9]|2[0-9]|3[0-1])\.\d+\.\d+:\d+$/.test(origin)
-        if (allowList.includes(origin) || isLocalDev) return cb(null, true)
-        return cb(new Error(`CORS blocked origin: ${origin}`))
-      },
-      credentials: true,
-    },
-  })
-
-  registerSeatSocket(io, sessionMiddleware)
-
-  server.listen(port, () => {
+  server = httpServer.listen(port, "0.0.0.0", () => {
     // eslint-disable-next-line no-console
-    console.log(`API listening on http://localhost:${port}`)
-  })
-  server.on('close', () => {
-    // eslint-disable-next-line no-console
-    console.log('API server closed.')
+    console.log(`API + Socket listening on http://0.0.0.0:${port}`)
   })
 }
 

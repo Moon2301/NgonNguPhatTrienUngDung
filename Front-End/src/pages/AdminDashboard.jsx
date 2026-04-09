@@ -64,6 +64,8 @@ export default function AdminDashboard() {
 
   if (!d) return <main className="page-shell"><p>Đang tải...</p></main>
 
+  const maxRevenue = Math.max(1, ...series.map((s) => Number(s.revenue || 0)))
+
   return (
     <main className="page-shell">
       <h1>Quản trị</h1>
