@@ -31,6 +31,7 @@ import AdminMovies from './pages/AdminMovies.jsx'
 import AdminShowtimes from './pages/AdminShowtimes.jsx'
 import AdminBookings from './pages/AdminBookings.jsx'
 import AdminUsers from './pages/AdminUsers.jsx'
+import AdminWalletTopups from './pages/AdminWalletTopups.jsx'
 import NotFoundPage from './pages/NotFoundPage.jsx'
 
 export default function App() {
@@ -163,6 +164,14 @@ export default function App() {
           element={
             <RequireAdmin>
               <AdminUsers />
+            </RequireAdmin>
+          }
+        />
+        <Route
+          path="admin/wallet-topups"
+          element={
+            <RequireAdmin>
+              <AdminWalletTopups />
             </RequireAdmin>
           }
         />
