@@ -1,15 +1,21 @@
 import cors from 'cors'
 import dotenv from 'dotenv'
 import express from 'express'
+import http from 'http'
 import session from 'express-session'
 import { createServer } from 'http'
 import { Server } from 'socket.io'
 import { registerSeatSocket } from './sockets/seatSocket.js'
 import { closeMongo, connectMongo } from './db.js'
+import { registerSeatSocket } from './socket/seatSocket.js'
 import authRoutes from './routes/auth.js'
 import adminRoutes from './routes/admin.js'
-import datingRoutes from './routes/dating.js'
+import bookingsRoutes from './routes/bookings.js'
+import commentsRoutes from './routes/comments.js'
 import moviesRoutes from './routes/movies.js'
+import newsRoutes from './routes/news.js'
+import paymentsVnpayRoutes from './routes/paymentsVnpay.js'
+import profileRoutes from './routes/profile.js'
 import promotionsRoutes from './routes/promotions.js'
 import cinemarRoutes from './routes/cinemar.js'
 import commentRoutes from './routes/comment.js'
@@ -20,6 +26,7 @@ import paymentsVnpayRoutes from './routes/paymentsVnpay.js'
 dotenv.config()
 
 const app = express()
+app.set('trust proxy', 1)
 
 app.use(express.json())
 const rawOrigin = process.env.CLIENT_ORIGIN || 'http://localhost:5173'
@@ -67,8 +74,12 @@ app.get('/health', (_req, res) => {
 app.get('/api/health', (_req, res) => res.json({ ok: true }))
 app.use('/api/auth', authRoutes)
 app.use('/api/admin', adminRoutes)
-app.use('/api/dating', datingRoutes)
+app.use('/api/bookings', bookingsRoutes)
+app.use('/api/comments', commentsRoutes)
 app.use('/api/movies', moviesRoutes)
+app.use('/api/news', newsRoutes)
+app.use('/api/payments/vnpay', paymentsVnpayRoutes)
+app.use('/api/profile', profileRoutes)
 app.use('/api/promotions', promotionsRoutes)
 app.use('/api', cinemarRoutes)
 app.use('/api', commentRoutes)
@@ -106,6 +117,7 @@ io.use((socket, next) => {
 registerSeatSocket(io)
 
 let server
+let io
 
 async function start() {
   await connectMongo()

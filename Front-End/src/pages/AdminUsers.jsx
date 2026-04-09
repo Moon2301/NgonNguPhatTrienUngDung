@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { API_BASE, apiPost } from '../api'
+import { useUi } from '../context/useUi.js'
 
 export default function AdminUsers() {
   const [users, setUsers] = useState([])
+  const ui = useUi()
 
   function load() {
     fetch(`${API_BASE}/api/admin/users`, { credentials: 'include' })
@@ -19,8 +21,9 @@ export default function AdminUsers() {
     try {
       await apiPost(`/api/admin/users/${id}`, { role })
       load()
+      ui.toast.success('Đã cập nhật quyền.')
     } catch (e) {
-      alert(e.message)
+      ui.toast.error(e.message)
     }
   }
 
@@ -28,22 +31,30 @@ export default function AdminUsers() {
     try {
       await apiPost(`/api/admin/users/${u.id}`, { isBlocked: !u.is_blocked })
       load()
+      ui.toast.success(u.is_blocked ? 'Đã mở khóa người dùng.' : 'Đã khóa người dùng.')
     } catch (e) {
-      alert(e.message)
+      ui.toast.error(e.message)
     }
   }
 
   async function del(u) {
-    if (!confirm(`Xóa user ${u.username}?`)) return
+    const ok = await ui.confirm({
+      title: 'Xóa người dùng',
+      message: `Xóa user ${u.username}?`,
+      confirmText: 'Xóa',
+      cancelText: 'Hủy',
+    })
+    if (!ok) return
     const res = await fetch(`${API_BASE}/api/admin/users/${u.id}`, { method: 'DELETE', credentials: 'include' })
     const data = await res.json().catch(() => ({}))
-    if (!res.ok) return alert(data.error || 'Xóa thất bại')
+    if (!res.ok) return ui.toast.error(data.error || 'Xóa thất bại')
     load()
+    ui.toast.success('Đã xóa người dùng.')
   }
 
   return (
     <main className="page-shell">
-      <Link to="/admin" className="back-link">
+      <Link to="/admin" className="btn-ghost" style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
         ← Dashboard
       </Link>
       <h1>Quản lý người dùng</h1>
@@ -55,6 +66,7 @@ export default function AdminUsers() {
             <th>Username</th>
             <th>Email</th>
             <th>Họ tên</th>
+            <th>Ví</th>
             <th>Role</th>
             <th>Khóa</th>
             <th></th>
@@ -67,6 +79,9 @@ export default function AdminUsers() {
               <td>{u.username}</td>
               <td>{u.email}</td>
               <td>{u.fullName || '—'}</td>
+              <td style={{ fontWeight: 800 }}>
+                {Number(u.wallet || 0).toLocaleString('vi-VN')}đ
+              </td>
               <td>
                 <select value={u.role || 'USER'} onChange={(e) => setRole(u.id, e.target.value)}>
                   <option value="USER">USER</option>
@@ -79,7 +94,7 @@ export default function AdminUsers() {
                 </button>
               </td>
               <td>
-                <button type="button" className="btn-ghost" onClick={() => del(u)}>
+                <button type="button" className="btn-danger" onClick={() => del(u)}>
                   Xóa
                 </button>
               </td>

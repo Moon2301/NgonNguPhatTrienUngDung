@@ -20,19 +20,25 @@ import BookingPage from './pages/BookingPage.jsx'
 import CheckoutPage from './pages/CheckoutPage.jsx'
 import VnpayReturnPage from './pages/VnpayReturnPage.jsx'
 import BookingSuccessPage from './pages/BookingSuccessPage.jsx'
+import VnpayReturnPage from './pages/VnpayReturnPage.jsx'
 import MyTicketsPage from './pages/MyTicketsPage.jsx'
 import TicketMarketPage from './pages/TicketMarketPage.jsx'
 import TicketPostPage from './pages/TicketPostPage.jsx'
 import TicketDetailPage from './pages/TicketDetailPage.jsx'
+import BookingViewPage from './pages/BookingViewPage.jsx'
 import MyPassesPage from './pages/MyPassesPage.jsx'
-import DatingProfilePage from './pages/DatingProfilePage.jsx'
+import ProfilePage from './pages/ProfilePage.jsx'
 import AdminDashboard from './pages/AdminDashboard.jsx'
 import AdminMovies from './pages/AdminMovies.jsx'
 import AdminShowtimes from './pages/AdminShowtimes.jsx'
 import AdminBookings from './pages/AdminBookings.jsx'
+import AdminPromotions from './pages/AdminPromotions.jsx'
+import AdminSeatPage from './pages/AdminSeatPage.jsx'
+import AdminProducts from './pages/AdminProducts.jsx'
 import AdminUsers from './pages/AdminUsers.jsx'
 import AdminWalletTopups from './pages/AdminWalletTopups.jsx'
 import NotFoundPage from './pages/NotFoundPage.jsx'
+import ErrorPage from './pages/ErrorPage.jsx'
 
 export default function App() {
   return (
@@ -46,11 +52,13 @@ export default function App() {
         <Route path="promotions" element={<PromotionsPage />} />
         <Route path="login" element={<LoginPage />} />
         <Route path="register" element={<RegisterPage />} />
+        <Route path="error" element={<ErrorPage />} />
         <Route path="movie/:id" element={<MovieDetailPage />} />
         <Route path="booking/:showtimeId" element={<BookingPage />} />
         <Route path="checkout" element={<CheckoutPage />} />
         <Route path="payment/vnpay-return" element={<VnpayReturnPage />} />
         <Route path="booking/success" element={<BookingSuccessPage />} />
+        <Route path="payment/vnpay-return" element={<VnpayReturnPage />} />
 
         <Route
           path="my-tickets"
@@ -70,6 +78,7 @@ export default function App() {
           }
         />
         <Route path="ticket/:id" element={<TicketDetailPage />} />
+        <Route path="ticket/view/:id" element={<BookingViewPage />} />
         <Route
           path="my-passes"
           element={
@@ -119,10 +128,10 @@ export default function App() {
   )
 }
         <Route
-          path="dating-profile"
+          path="profile"
           element={
             <RequireAuth>
-              <DatingProfilePage />
+              <ProfilePage />
             </RequireAuth>
           }
         />
@@ -152,10 +161,34 @@ export default function App() {
           }
         />
         <Route
+          path="admin/promotions"
+          element={
+            <RequireAdmin>
+              <AdminPromotions />
+            </RequireAdmin>
+          }
+        />
+        <Route
+          path="admin/products"
+          element={
+            <RequireAdmin>
+              <AdminProducts />
+            </RequireAdmin>
+          }
+        />
+        <Route
           path="admin/bookings"
           element={
             <RequireAdmin>
               <AdminBookings />
+            </RequireAdmin>
+          }
+        />
+        <Route
+          path="admin/seat"
+          element={
+            <RequireAdmin>
+              <AdminSeatPage />
             </RequireAdmin>
           }
         />

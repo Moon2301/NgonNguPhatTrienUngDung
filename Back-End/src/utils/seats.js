@@ -1,12 +1,12 @@
-export function parseSeats(raw) {
-    if (!raw) return [];
-    return String(raw)
-        .split(',')
-        .map((s) => s.trim())
-        .filter(Boolean);
+export function parseSeats(text) {
+  if (!text) return []
+  return String(text)
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
 }
 
 export function uniqueSeats(seats) {
-    return Array.from(new Set((seats || []).map((s) => String(s).trim()).filter(Boolean)));
+  return Array.from(new Set((seats || []).map((s) => String(s).trim()).filter(Boolean))).sort()
 }
 
