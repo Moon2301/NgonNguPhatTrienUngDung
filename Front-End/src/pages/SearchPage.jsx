@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { API_BASE } from '../api'
 import '../App.css'
-//Diem
+
 export default function SearchPage() {
   const [params] = useSearchParams()
   const q = params.get('q') || ''
@@ -13,6 +13,7 @@ export default function SearchPage() {
   useEffect(() => {
     let ignore = false
     const qs = q.trim() ? `?keyword=${encodeURIComponent(q.trim())}` : ''
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- loading state for fetch lifecycle
     setLoading(true)
     fetch(`${API_BASE}/api/movies${qs}`, { credentials: 'include' })
       .then(async (r) => {

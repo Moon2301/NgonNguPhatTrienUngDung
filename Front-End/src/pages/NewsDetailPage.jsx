@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { API_BASE } from '../api'
 import './pages-extra.css'
-//Diem
+
 export default function NewsDetailPage() {
   const { id } = useParams()
   const [article, setArticle] = useState(null)

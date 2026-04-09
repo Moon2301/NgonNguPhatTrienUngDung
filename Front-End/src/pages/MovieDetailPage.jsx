@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { API_BASE, apiPost } from '../api'
-import { useAuth } from '../context/AuthContext'
+import { useAuth } from '../context/useAuth.js'
 import { toYoutubeEmbedUrl } from '../utils/youtube'
 import '../App.css'
-//Diem
+
 export default function MovieDetailPage() {
   const { id } = useParams()
   const { user } = useAuth()

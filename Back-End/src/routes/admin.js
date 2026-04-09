@@ -1,85 +1,78 @@
-const express = require('express');
-const { z } = require('zod');
-const { asyncHandler } = require('../utils/asyncHandler');
-const { col, nextId } = require('../db');
-const { requireAdmin } = require('../middleware/auth');
+import express from 'express'
+import { z } from 'zod'
+import { col } from '../db.js'
+import { requireAdmin } from '../middleware/requireAuth.js'
+import { asyncHandler } from '../utils/asyncHandler.js'
 
-const router = express.Router();
+const router = express.Router()
 
 router.get(
-  '/movies',
+  '/dashboard',
   requireAdmin,
-  asyncHandler(async (req, res) => {
-    const rows = await col('movies').find({}).sort({ id: -1 }).toArray();
-    res.json({ movies: rows });
-  })
-);
+  asyncHandler(async (_req, res) => {
+    const [totalBookings, totalMovies, totalUsers] = await Promise.all([
+      col('bookings').countDocuments({}),
+      col('movies').countDocuments({}),
+      col('users').countDocuments({}),
+    ])
 
-router.post(
-  '/movies',
+    // Bookings not implemented yet → revenue is best-effort
+    res.json({ totalBookings, totalMovies, totalUsers, totalRevenue: 0 })
+  }),
+)
+
+router.get(
+  '/users',
+  requireAdmin,
+  asyncHandler(async (_req, res) => {
+    const rows = await col('users')
+      .find({}, { projection: { _id: 0, passwordHash: 0 } })
+      .sort({ id: 1 })
+      .toArray()
+    res.json({ users: rows })
+  }),
+)
+
+router.patch(
+  '/users/:id',
   requireAdmin,
   asyncHandler(async (req, res) => {
+    const id = Number(req.params.id)
+    if (!Number.isFinite(id)) return res.status(400).json({ error: 'ID không hợp lệ.' })
+
     const schema = z.object({
-      id: z.coerce.number().optional(),
-      title: z.string().min(1).max(255),
-      description: z.string().optional().nullable(),
-      director: z.string().optional().nullable(),
-      cast: z.string().optional().nullable(),
-      duration: z.coerce.number().int().min(1).max(1000),
-      releaseDate: z.string().optional().nullable(),
-      posterUrl: z.string().optional().nullable(),
-      genre: z.string().optional().nullable(),
-      trailerUrl: z.string().optional().nullable(),
-    });
-    const input = schema.parse(req.body);
+      role: z.enum(['USER', 'ADMIN']).optional(),
+      isBlocked: z.coerce.boolean().optional(),
+    })
+    const input = schema.parse(req.body)
 
-    if (input.id) {
-      await col('movies').updateOne(
-        { id: input.id },
-        {
-          $set: {
-            title: input.title,
-            description: input.description ?? null,
-            director: input.director ?? null,
-            cast: input.cast ?? null,
-            duration: input.duration,
-            release_date: input.releaseDate ? new Date(String(input.releaseDate)) : null,
-            poster_url: input.posterUrl ?? null,
-            genre: input.genre ?? null,
-            trailer_url: input.trailerUrl ?? null,
-            updated_at: new Date(),
-          },
-        }
-      );
-      return res.json({ id: input.id });
-    }
+    const $set = {}
+    if (input.role) $set.role = input.role
+    if (typeof input.isBlocked === 'boolean') $set.is_blocked = input.isBlocked
 
-    const id = await nextId('movies');
-    await col('movies').insertOne({
-      id,
-      title: input.title,
-      description: input.description ?? null,
-      director: input.director ?? null,
-      cast: input.cast ?? null,
-      duration: input.duration,
-      release_date: input.releaseDate ? new Date(String(input.releaseDate)) : null,
-      poster_url: input.posterUrl ?? null,
-      genre: input.genre ?? null,
-      trailer_url: input.trailerUrl ?? null,
-      created_at: new Date(),
-    });
-    res.status(201).json({ id });
-  })
-);
+    if (!Object.keys($set).length) return res.json({ success: true })
+
+    await col('users').updateOne({ id }, { $set })
+    const u = await col('users').findOne({ id }, { projection: { _id: 0, passwordHash: 0 } })
+    if (!u) return res.status(404).json({ error: 'Không tìm thấy user.' })
+    res.json({ user: u })
+  }),
+)
 
 router.delete(
-  '/movies/:id',
+  '/users/:id',
   requireAdmin,
   asyncHandler(async (req, res) => {
-    const id = Number(req.params.id);
-    await col('movies').deleteOne({ id });
-    res.json({ success: true });
-  })
-);
+    const id = Number(req.params.id)
+    if (!Number.isFinite(id)) return res.status(400).json({ error: 'ID không hợp lệ.' })
 
-module.exports = router;
+    // Prevent deleting root admin for safety
+    if (id === 1) return res.status(409).json({ error: 'Không thể xóa admin gốc.' })
+
+    await col('users').deleteOne({ id })
+    res.json({ success: true })
+  }),
+)
+
+export default router
+

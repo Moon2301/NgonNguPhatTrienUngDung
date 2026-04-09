@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { API_BASE } from '../api'
 import './pages-extra.css'
-//Diem
+
 export default function NewsPage() {
   const [list, setList] = useState([])
   useEffect(() => {

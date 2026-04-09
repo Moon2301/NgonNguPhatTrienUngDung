@@ -7,6 +7,8 @@ import { Server } from 'socket.io'
 import { registerSeatSocket } from './sockets/seatSocket.js'
 import { closeMongo, connectMongo } from './db.js'
 import authRoutes from './routes/auth.js'
+import adminRoutes from './routes/admin.js'
+import datingRoutes from './routes/dating.js'
 import moviesRoutes from './routes/movies.js'
 import promotionsRoutes from './routes/promotions.js'
 import bookingsRoutes from './routes/bookings.js'
@@ -61,12 +63,11 @@ app.get('/health', (_req, res) => {
 
 app.get('/api/health', (_req, res) => res.json({ ok: true }))
 app.use('/api/auth', authRoutes)
+app.use('/api/admin', adminRoutes)
+app.use('/api/dating', datingRoutes)
 app.use('/api/movies', moviesRoutes)
 app.use('/api/promotions', promotionsRoutes)
-app.use('/api/bookings', bookingsRoutes)
-app.use('/api/ticket-passes', ticketPassesRoutes)
-
-
+app.use('/api/uploads', uploadsRoutes)
 
 app.use((err, _req, res, _next) => {
   const message = err?.message || 'Server error'
