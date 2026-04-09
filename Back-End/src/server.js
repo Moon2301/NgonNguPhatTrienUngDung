@@ -11,6 +11,8 @@ import adminRoutes from './routes/admin.js'
 import datingRoutes from './routes/dating.js'
 import moviesRoutes from './routes/movies.js'
 import promotionsRoutes from './routes/promotions.js'
+import cinemarRoutes from './routes/cinemar.js'
+import commentRoutes from './routes/comment.js'
 import bookingsRoutes from './routes/bookings.js'
 import ticketPassesRoutes from './routes/ticketPasses.js'
 
@@ -67,6 +69,8 @@ app.use('/api/admin', adminRoutes)
 app.use('/api/dating', datingRoutes)
 app.use('/api/movies', moviesRoutes)
 app.use('/api/promotions', promotionsRoutes)
+app.use('/api', cinemarRoutes)
+app.use('/api', commentRoutes)
 app.use('/api/uploads', uploadsRoutes)
 
 app.use((err, _req, res, _next) => {
