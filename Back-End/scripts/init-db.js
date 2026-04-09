@@ -16,6 +16,7 @@ async function main() {
     col('showtimes').createIndex({ id: 1 }, { unique: true }),
     col('showtimes').createIndex({ movie_id: 1, start_time: 1 }),
     col('rooms').createIndex({ id: 1 }, { unique: true }),
+    col('products').createIndex({ id: 1 }, { unique: true }),
     col('promotions').createIndex({ code: 1 }, { unique: true }),
     col('bookings').createIndex({ user_id: 1, booking_time: -1 }),
     col('bookings').createIndex({ showtime_id: 1 }),
@@ -25,13 +26,8 @@ async function main() {
     col('group_payments').createIndex({ group_booking_id: 1 }),
     col('ticket_passes').createIndex({ booking_id: 1 }),
     col('ticket_passes').createIndex({ seller_id: 1, created_at: -1 }),
+    col('ticket_passes').createIndex({ status: 1, expire_at: 1, created_at: -1 }),
     col('comments').createIndex({ movie_id: 1, created_at: -1 }),
-    col('dating_profiles').createIndex({ user_id: 1 }, { unique: true }),
-    col('dating_matches').createIndex({ user1_id: 1, created_at: -1 }),
-    col('dating_matches').createIndex({ user2_id: 1, created_at: -1 }),
-    col('dating_messages').createIndex({ match_id: 1, created_at: 1 }),
-    col('dating_requests').createIndex({ from_user_id: 1, to_user_id: 1, status: 1 }),
-    col('dating_notifications').createIndex({ to_user_id: 1, is_shown: 1, created_at: -1 }),
   ])
 
   // eslint-disable-next-line no-console

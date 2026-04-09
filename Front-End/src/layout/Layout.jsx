@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/useAuth.js'
 import './layout.css'
@@ -11,11 +11,32 @@ export default function Layout() {
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [searchQ, setSearchQ] = useState('')
   const [navScrolled, setNavScrolled] = useState(false)
+  const [navHidden, setNavHidden] = useState(false)
+  const lastScrollYRef = useRef(0)
   const navigate = useNavigate()
 
   useEffect(() => {
-    const onScroll = () => setNavScrolled(window.scrollY > 20)
+    const onScroll = () => {
+      const y = window.scrollY || 0
+      setNavScrolled(y > 8)
+
+      const last = lastScrollYRef.current
+      const dy = y - last
+      lastScrollYRef.current = y
+
+      // Ở gần top thì luôn hiện
+      if (y < 40) {
+        setNavHidden(false)
+        return
+      }
+
+      // Cuộn xuống đủ ngưỡng → ẩn; cuộn lên → hiện
+      if (dy > 10) setNavHidden(true)
+      else if (dy < -8) setNavHidden(false)
+    }
     window.addEventListener('scroll', onScroll)
+    // init
+    onScroll()
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
 
@@ -33,17 +54,7 @@ export default function Layout() {
 
   return (
     <div className="layout-root">
-      <div className="pele-topbar">
-        <Link to="/promotions">
-          <i className="fa-solid fa-gift" /> KHUYẾN MÃI
-        </Link>
-        <span className="sep hide-xs">|</span>
-        <span className="hide-xs">
-          <i className="fa-solid fa-phone" /> Hotline: 1900 0000
-        </span>
-      </div>
-
-      <nav className={`pele-navbar ${navScrolled ? 'scrolled' : ''}`}>
+      <nav className={`pele-navbar ${navScrolled ? 'scrolled' : ''} ${navHidden ? 'hidden' : ''}`}>
         <div className="pele-navbar-inner">
           <div className="pele-navbar-left">
             <button
@@ -54,6 +65,7 @@ export default function Layout() {
             >
               <i className="fa-solid fa-bars" />
             </button>
+
             <Link to="/" className="pele-logo">
               <span className="pele-logo-mark">
                 <i className="fa-solid fa-film" />
@@ -62,6 +74,18 @@ export default function Layout() {
                 PELE<span>Cinema</span>
               </span>
             </Link>
+
+            <form className="pele-search-form pele-search-desktop" onSubmit={submitSearch}>
+              <input
+                value={searchQ}
+                onChange={(e) => setSearchQ(e.target.value)}
+                placeholder="Tìm phim..."
+                aria-label="Tìm phim"
+              />
+              <button type="submit" className="btn-search" aria-label="Tìm">
+                <i className="fa-solid fa-magnifying-glass" />
+              </button>
+            </form>
           </div>
 
           <div className="pele-navbar-center pele-nav-center">
@@ -111,18 +135,6 @@ export default function Layout() {
           </div>
 
           <div className="pele-navbar-right">
-            <form className="pele-search-form pele-search-desktop" onSubmit={submitSearch}>
-              <input
-                value={searchQ}
-                onChange={(e) => setSearchQ(e.target.value)}
-                placeholder="Tìm phim..."
-                aria-label="Tìm phim"
-              />
-              <button type="submit" className="btn-search" aria-label="Tìm">
-                <i className="fa-solid fa-magnifying-glass" />
-              </button>
-            </form>
-
             {!user && (
               <Link className="btn-login-nav" to="/login">
                 <i className="fa-solid fa-right-to-bracket" />
@@ -135,18 +147,25 @@ export default function Layout() {
                 <div className="user-mini">
                   <div className="user-avatar-nav">{(user.fullName || user.username || '?').charAt(0)}</div>
                   <span className="user-name-nav hide-xs">{user.fullName || user.username}</span>
+                  <span className="user-name-nav hide-xs" style={{ opacity: 0.9, fontWeight: 800 }}>
+                    · {Number(user.wallet || 0).toLocaleString('vi-VN')}đ
+                  </span>
                   <div className={`dropdown-wrap ${dropdownOpen ? 'open' : ''}`}>
                     <button type="button" onClick={() => setDropdownOpen((v) => !v)} aria-expanded={dropdownOpen}>
                       <i className="fa-solid fa-chevron-down" style={{ fontSize: '0.65rem' }} />
                     </button>
                     <div className="dropdown-menu-pele">
-                      <Link to="/dating-profile" onClick={() => setDropdownOpen(false)}>
+                      <Link to="/profile" onClick={() => setDropdownOpen(false)}>
                         <i className="fa-solid fa-user-pen" style={{ color: '#ff6b6b' }} />
-                        Hồ sơ Dating
+                        Hồ sơ
                       </Link>
                       <Link to="/my-tickets" onClick={() => setDropdownOpen(false)}>
                         <i className="fa-solid fa-ticket" style={{ color: '#5ce08a' }} />
                         Vé Đã Đặt
+                      </Link>
+                      <Link to="/my-passes" onClick={() => setDropdownOpen(false)}>
+                        <i className="fa-solid fa-tag" style={{ color: '#ffc107' }} />
+                        Vé Đang Bán Của Tôi
                       </Link>
                       <button
                         type="button"
@@ -221,9 +240,9 @@ export default function Layout() {
                 <i className="fa-solid fa-tag" />
                 Vé Đang Bán
               </Link>
-              <Link className="sidebar-nav-link" to="/dating-profile" onClick={() => setSidebarOpen(false)}>
+              <Link className="sidebar-nav-link" to="/profile" onClick={() => setSidebarOpen(false)}>
                 <i className="fa-solid fa-user-pen" />
-                Hồ Sơ Dating
+                Hồ Sơ
               </Link>
               {user.role === 'ADMIN' && (
                 <>
@@ -239,6 +258,14 @@ export default function Layout() {
                   <Link className="sidebar-nav-link accent-admin" to="/admin/showtimes" onClick={() => setSidebarOpen(false)}>
                     <i className="fa-solid fa-clock" />
                     Quản Lý Suất Chiếu
+                  </Link>
+                  <Link className="sidebar-nav-link accent-admin" to="/admin/seat" onClick={() => setSidebarOpen(false)}>
+                    <i className="fa-solid fa-border-all" />
+                    Sơ Đồ Ghế
+                  </Link>
+                  <Link className="sidebar-nav-link accent-admin" to="/admin/products" onClick={() => setSidebarOpen(false)}>
+                    <i className="fa-solid fa-burger" />
+                    Quản Lý Dịch Vụ
                   </Link>
                   <Link className="sidebar-nav-link accent-admin" to="/admin/bookings" onClick={() => setSidebarOpen(false)}>
                     <i className="fa-solid fa-receipt" />
@@ -261,6 +288,9 @@ export default function Layout() {
               <div>
                 <div style={{ fontWeight: 700 }}>{user.fullName}</div>
                 <div className="uname">@{user.username}</div>
+                <div className="uname" style={{ marginTop: 2, color: 'rgba(255,255,255,0.85)' }}>
+                  Số dư: {Number(user.wallet || 0).toLocaleString('vi-VN')}đ
+                </div>
               </div>
             </div>
             <button

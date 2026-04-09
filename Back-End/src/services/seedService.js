@@ -45,11 +45,6 @@ export async function runSeed() {
     'group_bookings',
     'group_members',
     'group_payments',
-    'dating_profiles',
-    'dating_matches',
-    'dating_messages',
-    'dating_requests',
-    'dating_notifications',
   ]
 
   await Promise.all(collectionsToReset.map((c) => col(c).deleteMany({})))
@@ -66,6 +61,8 @@ export async function runSeed() {
       fullName: u.fullName,
       phone: u.phone,
       role: u.role,
+      wallet: Number(u.wallet || 0),
+      age: typeof u.age === 'number' ? u.age : null,
       createdAt: new Date(),
     })
   }
@@ -112,6 +109,8 @@ export async function runSeed() {
     name: p.name,
     price: p.price,
     image_url: p.imageUrl ?? null,
+    category: p.category ?? null,
+    active: typeof p.active === 'boolean' ? p.active : true,
   }))
 
   const promotions = seedData.promotions.map((pr) => ({
@@ -164,11 +163,6 @@ export async function runSeed() {
     { _id: 'group_bookings', seq: 0 },
     { _id: 'group_members', seq: 0 },
     { _id: 'group_payments', seq: 0 },
-    { _id: 'dating_profiles', seq: 0 },
-    { _id: 'dating_matches', seq: 0 },
-    { _id: 'dating_messages', seq: 0 },
-    { _id: 'dating_requests', seq: 0 },
-    { _id: 'dating_notifications', seq: 0 },
   ]
   await col('counters').insertMany(counters)
 
