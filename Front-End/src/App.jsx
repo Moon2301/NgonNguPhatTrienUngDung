@@ -14,6 +14,7 @@ import RegisterPage from './pages/RegisterPage.jsx'
 import MovieDetailPage from './pages/MovieDetailPage.jsx'
 import BookingPage from './pages/BookingPage.jsx'
 import CheckoutPage from './pages/CheckoutPage.jsx'
+import VnpayReturnPage from './pages/VnpayReturnPage.jsx'
 import BookingSuccessPage from './pages/BookingSuccessPage.jsx'
 import MyTicketsPage from './pages/MyTicketsPage.jsx'
 import TicketMarketPage from './pages/TicketMarketPage.jsx'
@@ -43,6 +44,7 @@ export default function App() {
         <Route path="movie/:id" element={<MovieDetailPage />} />
         <Route path="booking/:showtimeId" element={<BookingPage />} />
         <Route path="checkout" element={<CheckoutPage />} />
+        <Route path="payment/vnpay-return" element={<VnpayReturnPage />} />
         <Route path="booking/success" element={<BookingSuccessPage />} />
 
         <Route

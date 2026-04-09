@@ -33,15 +33,15 @@ export default function CheckoutPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           code: promoCode,
-          originalAmount: totalAmount,
-          showtimeId,
+          amount: totalAmount,
         }),
       })
       const d = await res.json()
-      if (d.success) {
-        setFinalAmount(d.newTotal)
-        setDiscountText(d.discountText || '')
-      } else alert(d.message || 'Không áp dụng được')
+      if (!res.ok) throw new Error(d.error || 'Không áp dụng được')
+      const discountValue = Number(d.discountValue || 0)
+      const newTotal = Math.max(0, Number(totalAmount || 0) - discountValue)
+      setFinalAmount(newTotal)
+      setDiscountText(discountValue > 0 ? `Giảm ${discountValue.toLocaleString('vi-VN')}đ` : '')
     } catch {
       alert('Lỗi áp mã')
     }
@@ -57,15 +57,21 @@ export default function CheckoutPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           showtimeId,
-          seats: seats.join(','),
+          seats,
+          promoCode: promoCode || null,
           customerName,
           customerEmail,
           customerPhone: customerPhone || undefined,
-          finalAmount,
+          paymentMethod: 'VNPAY',
+          returnUrl: `${window.location.origin}/payment/vnpay-return`,
         }),
       })
       const d = await res.json()
       if (!res.ok) throw new Error(d.error || 'Lỗi')
+      if (d.paymentUrl) {
+        window.location.href = d.paymentUrl
+        return
+      }
       navigate('/booking/success', { state: { bookingId: d.bookingId }, replace: true })
     } catch (er) {
       alert(er.message)
