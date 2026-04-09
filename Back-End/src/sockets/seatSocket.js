@@ -125,3 +125,16 @@ export function getHeldSeatsLive(showtimeId) {
     }
     return [...new Set(allHeld)]
 }
+
+export function getHeldEntriesLive(showtimeId) {
+    const sId = showtimeId.toString()
+    const showtimeHolds = heldSeatsMap.get(sId)
+    if (!showtimeHolds) return []
+    const entries = []
+    for (const [socketId, seats] of showtimeHolds.entries()) {
+        for (const seat of seats) {
+            entries.push({ seat, socketId })
+        }
+    }
+    return entries
+}

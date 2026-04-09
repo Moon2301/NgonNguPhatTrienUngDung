@@ -1,4 +1,4 @@
-import { SEAT_HOLD_MS } from './showtimeSeatmap.js'
+import { getSeatHoldMs } from './showtimeSeatmap.js'
 import { uniqueSeats } from '../utils/seats.js'
 
 /**
@@ -53,7 +53,7 @@ export function getHeldEntriesLive(showtimeId) {
 export function holdSeats({ showtimeId, seats, userId, socketId }) {
   const sid = Number(showtimeId)
   const m = getShowtimeMap(sid)
-  const exp = nowMs() + SEAT_HOLD_MS
+  const exp = nowMs() + getSeatHoldMs()
   const seatList = uniqueSeats(seats || [])
   for (const s of seatList) {
     m.set(String(s), { userId: Number(userId), socketId: String(socketId), expiresAt: exp })
