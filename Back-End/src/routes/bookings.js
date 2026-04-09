@@ -199,39 +199,110 @@ router.get(
     requireAuth,
     asyncHandler(async (req, res) => {
         const userId = req.session.user.id;
+        const now = new Date();
+
+        // Fetch all non-failed bookings
         const bookings = await col('bookings')
-            .find({ user_id: userId, status: 'SUCCESS' })
+            .find({ user_id: userId, status: { $nin: ['FAILED', 'CANCELLED'] } })
             .sort({ booking_time: -1 })
             .toArray();
 
+        // Batch fetch showtimes
         const stIds = [...new Set(bookings.map((b) => b.showtime_id))];
         const showtimes = await col('showtimes').find({ id: { $in: stIds } }).toArray();
         const stMap = new Map(showtimes.map((s) => [s.id, s]));
 
+        // Batch fetch movies & rooms
         const mvIds = [...new Set(showtimes.map((s) => s.movie_id))];
-        const movies = await col('movies').find({ id: { $in: mvIds } }, { projection: { id: 1, title: 1, poster_url: 1 } }).toArray();
+        const movies = await col('movies').find({ id: { $in: mvIds } }).toArray();
         const mvMap = new Map(movies.map((m) => [m.id, m]));
 
         const rmIds = [...new Set(showtimes.map((s) => s.room_id))];
-        const rooms = await col('rooms').find({ id: { $in: rmIds } }, { projection: { id: 1, name: 1 } }).toArray();
+        const rooms = await col('rooms').find({ id: { $in: rmIds } }).toArray();
         const rmMap = new Map(rooms.map((r) => [r.id, r]));
 
         const result = bookings.map((b) => {
             const st = stMap.get(b.showtime_id);
             const mv = st ? mvMap.get(st.movie_id) : null;
             const rm = st ? rmMap.get(st.room_id) : null;
+
+            // Calculate Dynamic Status
+            let ticketStatus = 'PAST';
+            if (st && st.start_time) {
+                const startTime = new Date(st.start_time);
+                // End time = start + duration (default 120m)
+                const endTime = new Date(startTime.getTime() + (mv?.duration || 120) * 60000);
+
+                if (now < startTime) {
+                    ticketStatus = 'UPCOMING';
+                } else if (now >= startTime && now <= endTime) {
+                    ticketStatus = 'LIVE';
+                }
+            }
+
             return {
                 ...b,
-                movieTitle: mv?.title || null,
+                movieTitle: mv?.title || 'Phim không tên',
                 posterUrl: mv?.poster_url || null,
-                roomName: rm?.name || null,
+                duration: mv?.duration || 120,
+                roomName: rm?.name || 'Phòng chiếu',
                 start_time: st?.start_time || null,
+                ticketStatus: ticketStatus, // New field for UI tabs/badges
             };
         });
 
         res.json({ bookings: result });
     })
 );
+
+router.get(
+    '/public/:id',
+    asyncHandler(async (req, res) => {
+        const bookingId = Number(req.params.id);
+        const booking = await col('bookings').findOne({ id: bookingId });
+        if (!booking) return res.status(404).json({ error: 'Vé không tồn tại.' });
+
+        const st = await col('showtimes').findOne({ id: booking.showtime_id });
+        const mv = st ? await col('movies').findOne({ id: st.movie_id }) : null;
+        const rm = st ? await col('rooms').findOne({ id: st.room_id }) : null;
+
+        res.json({
+            id: booking.id,
+            movieTitle: mv?.title || 'Phim không tên',
+            posterUrl: mv?.poster_url || null,
+            duration: mv?.duration || 120,
+            roomName: rm?.name || 'Phòng chiếu',
+            start_time: st?.start_time || null,
+            seat_numbers: booking.seat_numbers,
+            customer_name: booking.customer_name,
+            total_amount: booking.total_amount,
+            status: booking.status,
+            booking_time: booking.booking_time
+        });
+    })
+);
+
+router.post(
+    '/:id/resend-email',
+    requireAuth,
+    asyncHandler(async (req, res) => {
+        const userId = req.session.user.id;
+        const bookingId = Number(req.params.id);
+        const booking = await col('bookings').findOne({ id: bookingId });
+
+        if (!booking) return res.status(404).json({ error: 'Không tìm thấy đơn hàng.' });
+        if (booking.user_id !== userId) return res.status(403).json({ error: 'Bạn không có quyền thực hiện hành động này.' });
+
+        // Simulating the email sending process
+        console.log(`[EMAIL SERVICE] Đang gửi lại vé tới ${booking.customer_email} cho đơn hàng #${booking.id}`);
+        
+        // Wait a bit to simulate network delay
+        await new Promise(r => setTimeout(r, 1000));
+
+        res.json({ message: 'Đã gửi lại vé vào email ' + booking.customer_email + ' thành công!' });
+    })
+);
+
 
 router.post(
     '/apply-promo',
