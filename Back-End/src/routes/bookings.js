@@ -6,6 +6,7 @@ import { requireAuth } from '../middleware/requireAuth.js';
 import { parseSeats, uniqueSeats } from '../utils/seats.js';
 import { getSeatStatesForShowtime, getSeatHoldMs } from '../services/showtimeSeatmap.js';
 import { areAdjacent, leavesLoneSeat } from '../utils/bookingValidation.js';
+import { sendTicketEmail } from '../services/emailService.js';
 
 const router = express.Router();
 
@@ -190,6 +191,20 @@ router.post(
             });
         }
 
+        // For Cash/Balance, if success - send email immediately (async)
+        if (status === 'SUCCESS') {
+            const [movie, room] = await Promise.all([
+                col('movies').findOne({ id: showtime.movie_id }),
+                col('rooms').findOne({ id: showtime.room_id })
+            ]);
+            const bookingForEmail = await col('bookings').findOne({ id: bookingId });
+            if (movie && room && bookingForEmail) {
+                sendTicketEmail(bookingForEmail, movie, showtime, room).catch(err => {
+                    console.error('[EMAIL] Failed to send initial ticket email:', err);
+                });
+            }
+        }
+
         res.json({ bookingId, status });
     })
 );
@@ -201,9 +216,9 @@ router.get(
         const userId = req.session.user.id;
         const now = new Date();
 
-        // Fetch all non-failed bookings
+        // Fetch all non-failed, non-transferred bookings
         const bookings = await col('bookings')
-            .find({ user_id: userId, status: { $nin: ['FAILED', 'CANCELLED'] } })
+            .find({ user_id: userId, status: { $nin: ['FAILED', 'CANCELLED', 'TRANSFERRED'] } })
             .sort({ booking_time: -1 })
             .toArray();
 
@@ -247,11 +262,24 @@ router.get(
                 duration: mv?.duration || 120,
                 roomName: rm?.name || 'Phòng chiếu',
                 start_time: st?.start_time || null,
+                originalPrice: Number(st?.price || 0),
                 ticketStatus: ticketStatus, // New field for UI tabs/badges
             };
         });
 
-        res.json({ bookings: result });
+        // Enrichment: Mark which seats are already listed for sale
+        const finalResults = await Promise.all(result.map(async (b) => {
+            const listed = await col('ticket_passes').find({ 
+                booking_id: b.id, 
+                status: 'AVAILABLE' 
+            }).toArray();
+            return {
+                ...b,
+                listedSeats: listed.map(l => l.seat_number)
+            };
+        }));
+
+        res.json({ bookings: finalResults });
     })
 );
 
@@ -293,13 +321,23 @@ router.post(
         if (!booking) return res.status(404).json({ error: 'Không tìm thấy đơn hàng.' });
         if (booking.user_id !== userId) return res.status(403).json({ error: 'Bạn không có quyền thực hiện hành động này.' });
 
-        // Simulating the email sending process
-        console.log(`[EMAIL SERVICE] Đang gửi lại vé tới ${booking.customer_email} cho đơn hàng #${booking.id}`);
-        
-        // Wait a bit to simulate network delay
-        await new Promise(r => setTimeout(r, 1000));
+        // Real email sending
+        const showtime = await col('showtimes').findOne({ id: booking.showtime_id });
+        if (!showtime) return res.status(404).json({ error: 'Không tìm thấy thông tin suất chiếu.' });
 
-        res.json({ message: 'Đã gửi lại vé vào email ' + booking.customer_email + ' thành công!' });
+        const [movie, room] = await Promise.all([
+            col('movies').findOne({ id: showtime.movie_id }),
+            col('rooms').findOne({ id: showtime.room_id })
+        ]);
+
+        if (!movie || !room) return res.status(500).json({ error: 'Dữ liệu phim hoặc phòng chiếu bị thiếu.' });
+
+        try {
+            await sendTicketEmail(booking, movie, showtime, room);
+            res.json({ message: 'Đã gửi lại vé vào email ' + booking.customer_email + ' thành công!' });
+        } catch (error) {
+            res.status(500).json({ error: 'Gửi email thất bại: ' + error.message });
+        }
     })
 );
 

@@ -10,6 +10,7 @@ import authRoutes from './routes/auth.js'
 import moviesRoutes from './routes/movies.js'
 import promotionsRoutes from './routes/promotions.js'
 import bookingsRoutes from './routes/bookings.js'
+import ticketPassesRoutes from './routes/ticketPasses.js'
 
 dotenv.config()
 
@@ -19,14 +20,18 @@ app.use(express.json())
 const rawOrigin = process.env.CLIENT_ORIGIN || 'http://localhost:5173'
 const allowList = rawOrigin.split(',').map((s) => s.trim()).filter(Boolean)
 
+const isOriginAllowed = (origin) => {
+  if (!origin) return true
+  const isLocalDev = /^http:\/\/localhost:\d+$/.test(origin) || 
+                     /^http:\/\/127\.0\.0\.1:\d+$/.test(origin) ||
+                     /^http:\/\/192\.168\.\d+\.\d+:\d+$/.test(origin)
+  return allowList.includes(origin) || isLocalDev
+}
+
 app.use(
   cors({
     origin: (origin, cb) => {
-      if (!origin) return cb(null, true)
-      const isLocalDev = /^http:\/\/localhost:\d+$/.test(origin) || 
-                         /^http:\/\/127\.0\.0\.1:\d+$/.test(origin) ||
-                         /^http:\/\/192\.168\.\d+\.\d+:\d+$/.test(origin)
-      if (allowList.includes(origin) || isLocalDev) return cb(null, true)
+      if (isOriginAllowed(origin)) return cb(null, true)
       return cb(new Error(`CORS blocked origin: ${origin}`))
     },
     credentials: true,
@@ -59,6 +64,7 @@ app.use('/api/auth', authRoutes)
 app.use('/api/movies', moviesRoutes)
 app.use('/api/promotions', promotionsRoutes)
 app.use('/api/bookings', bookingsRoutes)
+app.use('/api/ticket-passes', ticketPassesRoutes)
 
 
 
@@ -76,7 +82,10 @@ const port = Number(process.env.PORT) || 4000
 const httpServer = createServer(app)
 const io = new Server(httpServer, {
   cors: {
-    origin: allowList,
+    origin: (origin, cb) => {
+      if (isOriginAllowed(origin)) return cb(null, true)
+      return cb(null, false)
+    },
     credentials: true,
   },
 })
