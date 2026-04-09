@@ -14,7 +14,8 @@ import promotionsRoutes from './routes/promotions.js'
 import cinemarRoutes from './routes/cinemar.js'
 import commentRoutes from './routes/comment.js'
 import bookingsRoutes from './routes/bookings.js'
-import ticketPassesRoutes from './routes/ticketPasses.js'
+import uploadsRoutes from './routes/uploads.js'
+import paymentsVnpayRoutes from './routes/paymentsVnpay.js'
 
 dotenv.config()
 
@@ -72,6 +73,8 @@ app.use('/api/promotions', promotionsRoutes)
 app.use('/api', cinemarRoutes)
 app.use('/api', commentRoutes)
 app.use('/api/uploads', uploadsRoutes)
+app.use('/api/bookings', bookingsRoutes)
+app.use('/api/payments/vnpay', paymentsVnpayRoutes)
 
 app.use((err, _req, res, _next) => {
   const message = err?.message || 'Server error'

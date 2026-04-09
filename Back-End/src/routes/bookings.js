@@ -179,16 +179,26 @@ router.post(
             booking_time: new Date(),
             status: status,
             payment_method: input.paymentMethod,
+            payment_status: status,
             promo_code: appliedPromo,
             promo_discount: promoDiscount,
             products: productSnapshots,
         });
 
         if (input.paymentMethod === 'VNPAY') {
-            return res.json({
-                bookingId,
-                paymentUrl: `https://vnpay-mock.example.com/pay?id=${bookingId}&amount=${totalAmount}&returnUrl=${encodeURIComponent(input.returnUrl || '')}`,
+            const r = await fetch(`${process.env.INTERNAL_API_BASE || `http://localhost:${process.env.PORT || 4000}`}/api/payments/vnpay/create`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    bookingId,
+                    amount: totalAmount,
+                    orderInfo: `Thanh toán booking #${bookingId}`,
+                    returnUrl: input.returnUrl,
+                }),
             });
+            const d = await r.json().catch(() => ({}));
+            if (!r.ok) return res.status(r.status).json({ error: d.error || 'Không tạo được URL thanh toán.' });
+            return res.status(201).json({ bookingId, paymentUrl: d.url });
         }
 
         // For Cash/Balance, if success - send email immediately (async)
