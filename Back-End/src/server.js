@@ -1,13 +1,12 @@
 import cors from 'cors'
 import dotenv from 'dotenv'
 import express from 'express'
-import http from 'http'
 import session from 'express-session'
 import { createServer } from 'http'
 import { Server } from 'socket.io'
 import { registerSeatSocket } from './sockets/seatSocket.js'
 import { closeMongo, connectMongo } from './db.js'
-import { registerSeatSocket } from './socket/seatSocket.js'
+
 import authRoutes from './routes/auth.js'
 import adminRoutes from './routes/admin.js'
 import bookingsRoutes from './routes/bookings.js'
@@ -19,9 +18,10 @@ import profileRoutes from './routes/profile.js'
 import promotionsRoutes from './routes/promotions.js'
 import cinemarRoutes from './routes/cinemar.js'
 import commentRoutes from './routes/comment.js'
-import bookingsRoutes from './routes/bookings.js'
 import uploadsRoutes from './routes/uploads.js'
-import paymentsVnpayRoutes from './routes/paymentsVnpay.js'
+import showtimesRoutes from './routes/showtimes.js'
+import ticketPassesRoutes from './routes/ticketPasses.js'
+import ticketsRoutes from './routes/tickets.js'
 
 dotenv.config()
 
@@ -34,7 +34,7 @@ const allowList = rawOrigin.split(',').map((s) => s.trim()).filter(Boolean)
 
 const isOriginAllowed = (origin) => {
   if (!origin) return true
-  const isLocalDev = /^http:\/\/localhost:\d+$/.test(origin) || 
+  const isLocalDev = /^http:\/\/localhost:\d+$/.test(origin) ||
                      /^http:\/\/127\.0\.0\.1:\d+$/.test(origin) ||
                      /^http:\/\/192\.168\.\d+\.\d+:\d+$/.test(origin)
   return allowList.includes(origin) || isLocalDev
@@ -49,7 +49,6 @@ app.use(
     credentials: true,
   }),
 )
-
 
 const sessionMiddleware = session({
   name: 'sid',
@@ -66,7 +65,6 @@ const sessionMiddleware = session({
 
 app.use(sessionMiddleware)
 
-
 app.get('/health', (_req, res) => {
   res.json({ ok: true })
 })
@@ -81,17 +79,17 @@ app.use('/api/news', newsRoutes)
 app.use('/api/payments/vnpay', paymentsVnpayRoutes)
 app.use('/api/profile', profileRoutes)
 app.use('/api/promotions', promotionsRoutes)
+app.use('/api/showtimes', showtimesRoutes)
+app.use('/api/ticket-passes', ticketPassesRoutes)
+app.use('/api/tickets', ticketsRoutes)
 app.use('/api', cinemarRoutes)
 app.use('/api', commentRoutes)
 app.use('/api/uploads', uploadsRoutes)
-app.use('/api/bookings', bookingsRoutes)
-app.use('/api/payments/vnpay', paymentsVnpayRoutes)
 
 app.use((err, _req, res, _next) => {
   const message = err?.message || 'Server error'
   const status = err?.status || 500
   if (status >= 500) {
-    // eslint-disable-next-line no-console
     console.error(err)
   }
   res.status(status).json({ error: message })
@@ -113,32 +111,25 @@ io.use((socket, next) => {
   sessionMiddleware(socket.request, {}, next)
 })
 
-
 registerSeatSocket(io)
-
-let server
-let io
 
 async function start() {
   await connectMongo()
-  server = httpServer.listen(port, "0.0.0.0", () => {
-    // eslint-disable-next-line no-console
+  httpServer.listen(port, '0.0.0.0', () => {
     console.log(`API + Socket listening on http://0.0.0.0:${port}`)
   })
 }
 
 start().catch((err) => {
-  // eslint-disable-next-line no-console
   console.error(err)
   process.exit(1)
 })
 
 process.on('SIGINT', async () => {
   try {
-    if (server) server.close()
+    httpServer.close()
     await closeMongo()
   } finally {
     process.exit(0)
   }
 })
-

@@ -12,15 +12,11 @@ import PromotionsPage from './pages/PromotionsPage.jsx'
 import LoginPage from './pages/LoginPage.jsx'
 import RegisterPage from './pages/RegisterPage.jsx'
 import CinemaPage from './pages/CinemaPage.jsx'
-import { useAuth } from './context/useAuth.js'
-
-const navClass = ({ isActive }) => (isActive ? 'active' : '')
 import MovieDetailPage from './pages/MovieDetailPage.jsx'
 import BookingPage from './pages/BookingPage.jsx'
 import CheckoutPage from './pages/CheckoutPage.jsx'
 import VnpayReturnPage from './pages/VnpayReturnPage.jsx'
 import BookingSuccessPage from './pages/BookingSuccessPage.jsx'
-import VnpayReturnPage from './pages/VnpayReturnPage.jsx'
 import MyTicketsPage from './pages/MyTicketsPage.jsx'
 import TicketMarketPage from './pages/TicketMarketPage.jsx'
 import TicketPostPage from './pages/TicketPostPage.jsx'
@@ -53,12 +49,12 @@ export default function App() {
         <Route path="login" element={<LoginPage />} />
         <Route path="register" element={<RegisterPage />} />
         <Route path="error" element={<ErrorPage />} />
+        <Route path="cinema" element={<CinemaPage />} />
         <Route path="movie/:id" element={<MovieDetailPage />} />
         <Route path="booking/:showtimeId" element={<BookingPage />} />
         <Route path="checkout" element={<CheckoutPage />} />
         <Route path="payment/vnpay-return" element={<VnpayReturnPage />} />
         <Route path="booking/success" element={<BookingSuccessPage />} />
-        <Route path="payment/vnpay-return" element={<VnpayReturnPage />} />
 
         <Route
           path="my-tickets"
@@ -87,46 +83,6 @@ export default function App() {
             </RequireAuth>
           }
         />
-
-          <div className="pele-nav-links">
-            <NavLink to="/" end className={navClass}>
-              Trang chủ
-            </NavLink>
-            <NavLink to="/cinema" className={navClass}>
-              Rạp & Suất chiếu
-            </NavLink>
-            {!user ? (
-              <>
-                <NavLink to="/login" className={navClass}>
-                  Đăng nhập
-                </NavLink>
-                <NavLink to="/register" className={navClass}>
-                  Đăng ký
-                </NavLink>
-              </>
-            ) : (
-              <button
-                type="button"
-                className="btn-clear"
-                onClick={() => logout()}
-                style={{ padding: '8px 14px', borderRadius: 8 }}
-              >
-                Đăng xuất
-              </button>
-            )}
-          </div>
-        </div>
-      </nav>
-
-      <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/cinema" element={<CinemaPage />} />
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
-      </Routes>
-    </div>
-  )
-}
         <Route
           path="profile"
           element={

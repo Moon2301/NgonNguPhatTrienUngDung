@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { col, nextId } from '../db.js'
 import { requireAdmin } from '../middleware/requireAuth.js'
 import { asyncHandler } from '../utils/asyncHandler.js'
-import { getSeatStatesForShowtime, SEAT_HOLD_MS } from '../services/showtimeSeatmap.js'
+import { getSeatStatesForShowtime, getSeatHoldMs } from '../services/showtimeSeatmap.js'
 
 const router = express.Router()
 
@@ -572,41 +572,6 @@ router.get(
   }),
 )
 
-router.get(
-  '/wallet-topups',
-  requireAdmin,
-  asyncHandler(async (req, res) => {
-    const rows = await col('payments')
-      .find({ provider: 'VNPAY', purpose: 'TOPUP' })
-      .sort({ created_at: -1, _id: -1 })
-      .limit(500)
-      .toArray()
-    const userIds = [...new Set(rows.map((p) => p.user_id).filter((x) => x != null).map((x) => Number(x)))]
-    const users = userIds.length
-      ? await col('users')
-          .find({ id: { $in: userIds } }, { projection: { id: 1, username: 1, fullName: 1, email: 1 } })
-          .toArray()
-      : []
-    const userMap = new Map(users.map((u) => [Number(u.id), u]))
-    res.json({
-      topups: rows.map((p) => {
-        const u = p.user_id != null ? userMap.get(Number(p.user_id)) : null
-        return {
-          id: p._id,
-          user: u
-            ? { username: u.username || null, fullName: u.fullName || null, email: u.email || null }
-            : { username: null, fullName: null, email: null },
-          amount: Number(p.amount || 0),
-          status: p.status || null,
-          txn_ref: p.txn_ref || null,
-          created_at: p.created_at || null,
-          vnp_response_code: p.vnp_response_code || null,
-        }
-      }),
-    })
-  }),
-)
-
 router.post(
   '/bookings/:id/status',
   requireAdmin,
@@ -716,7 +681,7 @@ router.get(
       .sort({ booking_time: -1, id: -1 })
       .toArray()
 
-    const cutoff = Date.now() - SEAT_HOLD_MS
+    const cutoff = Date.now() - getSeatHoldMs()
     const activeBookings = bookingDocs.filter((b) => {
       if (b.status !== 'PENDING') return true
       const t = b.booking_time ? new Date(b.booking_time).getTime() : 0
@@ -734,7 +699,7 @@ router.get(
       occupiedSeats,
       bookedSeats,
       heldSeats,
-      holdMinutes: Math.round(SEAT_HOLD_MS / 60000),
+      holdMinutes: Math.round(getSeatHoldMs() / 60000),
       bookings: activeBookings,
     })
   }),

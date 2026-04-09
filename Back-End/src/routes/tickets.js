@@ -19,12 +19,8 @@ function requireTicketSecret() {
   return s
 }
 
-function to20DigitsFromHmac({ secret, message }) {
-  const hex = crypto.createHmac('sha256', secret).update(message, 'utf-8').digest('hex')
-  const bi = BigInt(`0x${hex}`)
-  const mod = 10n ** 20n
-  const n = bi % mod
-  return n.toString().padStart(20, '0')
+function hmacHex({ secret, message }) {
+  return crypto.createHmac('sha256', secret).update(message, 'utf-8').digest('hex')
 }
 
 router.get(
@@ -49,18 +45,18 @@ router.get(
     const seats = uniqueSeats(parseSeats(booking.seat_numbers || ''))
     if (!seats.includes(seat)) return res.status(400).json({ error: 'Ghế không thuộc vé này.' })
 
-    // Vé đang đăng bán/đang bị khoá → không cho tạo QR
-    const selling = await col('ticket_passes').findOne(
-      { booking_id: booking.id, seat_number: seat, status: { $in: ['AVAILABLE', 'LOCKED'] } },
-      { projection: { id: 1 } },
+    const pass = await col('ticket_passes').findOne(
+      { booking_id: booking.id, seat_number: seat, status: { $in: ['AVAILABLE', 'LOCKED', 'SOLD'] } },
+      { projection: { id: 1, status: 1 } },
     )
-    if (selling) return res.status(409).json({ error: 'Vé đang được đăng bán nên không thể tạo QR.' })
+    if (pass?.status === 'SOLD') return res.status(409).json({ error: 'Ghế này đã được bán, không thể tạo QR.' })
+    if (pass) return res.status(409).json({ error: 'Ghế đang được đăng bán, không thể tạo QR.' })
 
     const secret = requireTicketSecret()
     const ticketKey = `PELE-${booking.id}-${seat}`
-    const code20 = to20DigitsFromHmac({ secret, message: ticketKey })
-    const payload = `PELE${code20}`
-    res.json({ bookingId: booking.id, seat, code: code20, payload })
+    const code = hmacHex({ secret, message: ticketKey })
+    const payload = `PELE-${code}`
+    res.json({ bookingId: booking.id, seat, code, payload })
   }),
 )
 

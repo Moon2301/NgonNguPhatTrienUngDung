@@ -290,7 +290,7 @@ router.post(
       { $set: { status: 'LOCKED', locked_by: buyerId, locked_at: new Date() } },
       { returnDocument: 'after' },
     )
-    const lockedPass = locked?.value
+    const lockedPass = locked?.value ?? locked
     if (!lockedPass) return res.status(409).json({ error: 'Vé không còn khả dụng.' })
 
     const sellerBooking = await col('bookings').findOne({ id: bookingId }, { projection: { id: 1, user_id: 1, showtime_id: 1, seat_numbers: 1, status: 1 } })
