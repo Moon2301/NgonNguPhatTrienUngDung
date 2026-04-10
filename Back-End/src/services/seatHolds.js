@@ -1,10 +1,10 @@
-import { getSeatHoldMs } from './showtimeSeatmap.js'
+import { getHoldDurationMS } from '../utils/bookingValidation.js'
 import { uniqueSeats } from '../utils/seats.js'
 
 /**
  * In-memory seat holds keyed by showtime.
  *
- * Map<showtimeId, Map<seatId, { userId: number, socketId: string, expiresAt: number }>>
+ * Map<showtimeId, Map<seatId, { userId, socketId, expiresAt }>>
  */
 const holdsByShowtime = new Map()
 
@@ -24,16 +24,25 @@ function getShowtimeMap(showtimeId) {
 
 export function cleanupExpired(showtimeId) {
   const m = holdsByShowtime.get(Number(showtimeId))
-  if (!m) return
+  if (!m) return false
   const now = nowMs()
+  let changed = false
   for (const [seat, v] of m.entries()) {
-    if (!v || v.expiresAt <= now) m.delete(seat)
+    if (!v || v.expiresAt <= now) {
+      m.delete(seat)
+      changed = true
+    }
   }
   if (!m.size) holdsByShowtime.delete(Number(showtimeId))
+  return changed
 }
 
 export function cleanupAllExpired() {
-  for (const key of holdsByShowtime.keys()) cleanupExpired(key)
+  const changed = []
+  for (const key of holdsByShowtime.keys()) {
+    if (cleanupExpired(key)) changed.push(key)
+  }
+  return changed
 }
 
 export function getHeldSeatsLive(showtimeId) {
@@ -50,10 +59,19 @@ export function getHeldEntriesLive(showtimeId) {
   return [...m.entries()].map(([seat, v]) => ({ seat, ...v }))
 }
 
+export function isHeldByOther(showtimeId, seatId, userId) {
+  cleanupExpired(showtimeId)
+  const m = holdsByShowtime.get(Number(showtimeId))
+  if (!m) return false
+  const v = m.get(String(seatId))
+  if (!v) return false
+  return Number(v.userId) !== Number(userId)
+}
+
 export function holdSeats({ showtimeId, seats, userId, socketId }) {
   const sid = Number(showtimeId)
   const m = getShowtimeMap(sid)
-  const exp = nowMs() + getSeatHoldMs()
+  const exp = nowMs() + getHoldDurationMS()
   const seatList = uniqueSeats(seats || [])
   for (const s of seatList) {
     m.set(String(s), { userId: Number(userId), socketId: String(socketId), expiresAt: exp })
@@ -81,6 +99,7 @@ export function releaseSeats({ showtimeId, seats, userId, socketId }) {
 
 export function releaseAllForSocket(socketId) {
   const sid = String(socketId)
+  const affected = []
   for (const [showtimeId, m] of holdsByShowtime.entries()) {
     let changed = false
     for (const [seat, v] of m.entries()) {
@@ -90,7 +109,8 @@ export function releaseAllForSocket(socketId) {
       }
     }
     if (!m.size) holdsByShowtime.delete(showtimeId)
-    if (changed) cleanupExpired(showtimeId)
+    if (changed) affected.push(showtimeId)
   }
+  return affected
 }
 

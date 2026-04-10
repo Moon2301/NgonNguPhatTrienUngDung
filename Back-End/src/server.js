@@ -57,8 +57,8 @@ const sessionMiddleware = session({
   saveUninitialized: false,
   cookie: {
     httpOnly: true,
-    sameSite: 'lax',
-    secure: false,
+    sameSite: process.env.COOKIE_SAMESITE || 'lax',
+    secure: process.env.COOKIE_SECURE === 'true',
     maxAge: 1000 * 60 * 60 * 24 * 7,
   },
 })
